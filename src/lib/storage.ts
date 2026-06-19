@@ -27,3 +27,7 @@ export function readHistory(): GenerationRecord[] {
 export function writeHistory(history: GenerationRecord[]) {
   window.localStorage.setItem(HISTORY_STORAGE, JSON.stringify(history.slice(0, 12)))
 }
+
+export function removeHistoryItem(id: string) {
+  window.localStorage.setItem(HISTORY_STORAGE, JSON.stringify(readHistory().filter((item) => item.id !== id)))
+}

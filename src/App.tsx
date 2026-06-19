@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/sonner"
 import { WelcomePanel } from "@/components/welcome-panel"
 import { generateImage, normalizeGenerationError } from "@/lib/agnes"
-import { clearApiKey, readApiKey, readHistory, writeApiKey, writeHistory } from "@/lib/storage"
+import { clearApiKey, readApiKey, readHistory, removeHistoryItem, writeApiKey, writeHistory } from "@/lib/storage"
 import type { ConversationEntry, GenerationRecord, PromptSuggestion } from "@/types"
 
 const suggestions: PromptSuggestion[] = [
@@ -93,6 +93,15 @@ function App() {
     setSidebarOpen(false)
   }
 
+  const deleteHistory = (id: string) => {
+    setHistory((current) => {
+      const next = current.filter((item) => item.id !== id)
+      removeHistoryItem(id)
+      return next
+    })
+    toast.success("已删除该创作")
+  }
+
   const saveKey = (value: string) => {
     if (!value) {
       toast.error("请输入有效的 API Key")
@@ -164,6 +173,7 @@ function App() {
           onNewChat={resetConversation}
           onOpenSettings={() => setSettingsOpen(true)}
           onSelectHistory={selectHistory}
+          onDeleteHistory={deleteHistory}
         />
 
         <main className="relative flex min-w-0 flex-col">

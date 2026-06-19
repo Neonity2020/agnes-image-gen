@@ -1,6 +1,7 @@
-import { ChevronRight, Command, Menu, Plus, X } from "lucide-react"
+import { ChevronRight, Command, Menu, Plus, Trash2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import type { GenerationRecord } from "@/types"
@@ -14,6 +15,7 @@ type AppSidebarProps = {
   onNewChat: () => void
   onOpenSettings: () => void
   onSelectHistory: (item: GenerationRecord) => void
+  onDeleteHistory: (id: string) => void
 }
 
 function relativeTime(timestamp: number) {
@@ -24,7 +26,7 @@ function relativeTime(timestamp: number) {
   return new Date(timestamp).toLocaleDateString("zh-CN", { month: "short", day: "numeric" })
 }
 
-export function AppSidebar({ open, apiConfigured, history, logo, onClose, onNewChat, onOpenSettings, onSelectHistory }: AppSidebarProps) {
+export function AppSidebar({ open, apiConfigured, history, logo, onClose, onNewChat, onOpenSettings, onSelectHistory, onDeleteHistory }: AppSidebarProps) {
   return (
     <>
       <aside className={cn("fixed inset-y-0 left-0 z-40 flex w-[272px] -translate-x-full flex-col border-r border-black/10 bg-[#efede7]/90 p-[25px_18px_18px] backdrop-blur-2xl transition-transform duration-200 md:relative md:translate-x-0", open && "translate-x-0")}>
@@ -53,13 +55,23 @@ export function AppSidebar({ open, apiConfigured, history, logo, onClose, onNewC
             <ScrollArea className="mt-3 h-[calc(100dvh-330px)]">
               <div className="space-y-1 pr-2">
                 {history.map((item) => (
-                  <button key={item.id} type="button" onClick={() => onSelectHistory(item)} className="flex w-full items-center gap-2.5 rounded-[10px] bg-transparent p-2 text-left transition-colors hover:bg-white/65">
-                    <img src={item.image} alt="" className="size-[38px] rounded-lg bg-neutral-200 object-cover" />
-                    <span className="flex min-w-0 flex-col gap-0.5">
-                      <strong className="truncate text-[14px] font-medium">{item.prompt}</strong>
-                      <small className="text-[11px] text-[#85827a]">{relativeTime(item.created)}</small>
-                    </span>
-                  </button>
+                  <ContextMenu key={item.id}>
+                    <ContextMenuTrigger asChild>
+                      <button type="button" onClick={() => onSelectHistory(item)} className="flex w-full items-center gap-2.5 rounded-[10px] bg-transparent p-2 text-left outline-none transition-colors hover:bg-white/65 focus-visible:ring-2 focus-visible:ring-ring/30 data-[state=open]:bg-white/65">
+                        <img src={item.image} alt="" className="size-[38px] rounded-lg bg-neutral-200 object-cover" />
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <strong className="truncate text-[14px] font-medium">{item.prompt}</strong>
+                          <small className="text-[11px] text-[#85827a]">{relativeTime(item.created)}</small>
+                        </span>
+                      </button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem onSelect={() => onDeleteHistory(item.id)} className="text-[#be462d] focus:bg-[#be462d]/10 focus:text-[#9e402c]">
+                        <Trash2 className="size-4" />
+                        删除
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 ))}
               </div>
             </ScrollArea>
