@@ -1,10 +1,10 @@
-import { Copy, Download, LoaderCircle } from "lucide-react"
+import { Copy, Download, LoaderCircle, Wand2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import type { ConversationEntry } from "@/types"
 
-export function Conversation({ entries }: { entries: ConversationEntry[] }) {
+export function Conversation({ entries, onEditImage }: { entries: ConversationEntry[]; onEditImage: (image: string) => void }) {
   return (
     <div className="mx-auto mt-4 w-full max-w-[820px]" aria-live="polite">
       {entries.map((entry) => (
@@ -23,6 +23,7 @@ export function Conversation({ entries }: { entries: ConversationEntry[] }) {
                 <img src={entry.image} alt={entry.prompt} className="block max-h-[62vh] max-w-full object-contain" />
                 <div className="absolute bottom-3 right-3 flex gap-2 opacity-100 transition-all md:translate-y-1 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100">
                   <Button asChild size="icon" className="rounded-[10px] bg-[#1a1916]/80 text-white backdrop-blur hover:bg-black"><a href={entry.image} download={`agnes-image-${entry.created}.png`} aria-label="下载图片"><Download className="size-4" /></a></Button>
+                  <Button type="button" size="icon" onClick={() => onEditImage(entry.image!)} className="rounded-[10px] bg-[#1a1916]/80 text-white backdrop-blur hover:bg-black" aria-label="基于此图继续编辑"><Wand2 className="size-4" /></Button>
                   <Button type="button" size="icon" onClick={async () => { await navigator.clipboard.writeText(entry.prompt); toast.success("提示词已复制") }} className="rounded-[10px] bg-[#1a1916]/80 text-white backdrop-blur hover:bg-black" aria-label="复制提示词"><Copy className="size-4" /></Button>
                 </div>
               </div>

@@ -47,6 +47,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [referenceImage, setReferenceImage] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const workspaceRef = useRef<HTMLElement>(null)
 
@@ -62,6 +63,7 @@ function App() {
     setEntries([])
     setPrompt("")
     setSidebarOpen(false)
+    setReferenceImage(null)
     focusPrompt()
   }, [focusPrompt, loading])
 
@@ -86,6 +88,14 @@ function App() {
     setPrompt(value)
     focusPrompt()
   }
+
+  // Begin an img2img edit: seed the composer with the chosen image as reference.
+  const selectEditImage = (image: string) => {
+    setReferenceImage(image)
+    focusPrompt()
+  }
+
+  const removeReferenceImage = () => setReferenceImage(null)
 
   const selectHistory = (item: GenerationRecord) => {
     if (loading) return
@@ -135,10 +145,12 @@ function App() {
     const pending: ConversationEntry = { id, prompt: cleanPrompt, size, created, status: "loading" }
     setEntries((current) => [...current, pending])
     setPrompt("")
+    const editingImage = referenceImage
+    setReferenceImage(null)
     setLoading(true)
 
     try {
-      const image = await generateImage(cleanPrompt, size, apiKey)
+      const image = await generateImage(cleanPrompt, size, apiKey, editingImage ?? undefined)
       const record: GenerationRecord = { id, prompt: cleanPrompt, size, image, created }
       setEntries((current) => current.map((entry) => entry.id === id ? { ...entry, image, status: "success" } : entry))
       setHistory((current) => {
@@ -189,10 +201,10 @@ function App() {
           </header>
 
           <section ref={workspaceRef} className="min-h-0 flex-1 overflow-y-auto scroll-smooth px-4 pb-[190px] pt-5 md:px-[clamp(24px,7vw,110px)] md:pt-8">
-            {entries.length === 0 ? <WelcomePanel suggestions={suggestions} onSelect={selectSuggestion} /> : <Conversation entries={entries} />}
+            {entries.length === 0 ? <WelcomePanel suggestions={suggestions} onSelect={selectSuggestion} /> : <Conversation entries={entries} onEditImage={selectEditImage} />}
           </section>
 
-          <PromptComposer prompt={prompt} size={size} loading={loading} textareaRef={textareaRef} onPromptChange={setPrompt} onSizeChange={setSize} onSubmit={handleSubmit} />
+          <PromptComposer prompt={prompt} size={size} loading={loading} referenceImage={referenceImage} textareaRef={textareaRef} onPromptChange={setPrompt} onSizeChange={setSize} onRemoveReferenceImage={removeReferenceImage} onSubmit={handleSubmit} />
         </main>
       </div>
 

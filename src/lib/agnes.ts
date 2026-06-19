@@ -14,7 +14,7 @@ function imageFromResponse(payload: AgnesResponse) {
   throw new Error(payload.error?.message ?? payload.message ?? "API 没有返回可用的图片数据。")
 }
 
-export async function generateImage(prompt: string, size: string, apiKey: string) {
+export async function generateImage(prompt: string, size: string, apiKey: string, referenceImage?: string) {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 360_000)
 
@@ -29,7 +29,8 @@ export async function generateImage(prompt: string, size: string, apiKey: string
         model: MODEL,
         prompt,
         size,
-        extra_body: { response_format: "url" },
+        // img2img shares the same endpoint; the input image goes inside extra_body.image.
+        extra_body: { response_format: "url", ...(referenceImage ? { image: [referenceImage] } : {}) },
       }),
       signal: controller.signal,
     })
