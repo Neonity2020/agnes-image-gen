@@ -30,7 +30,7 @@ export function PromptComposer({ prompt, size, loading, textareaRef, onPromptCha
   }
 
   return (
-    <div className="absolute bottom-2.5 left-1/2 z-20 w-[calc(100%-24px)] -translate-x-1/2 md:bottom-[17px] md:left-[calc(272px+(100%-272px)/2)] md:w-[min(720px,calc(100%-272px-48px))]">
+    <div className="absolute bottom-2.5 left-1/2 z-20 w-[calc(100%-24px)] -translate-x-1/2 md:bottom-[17px] md:w-[min(720px,calc(100%-48px))]">
       <form onSubmit={onSubmit} className="rounded-[19px] border border-black/15 bg-white/90 p-[16px_16px_12px] shadow-[0_18px_65px_rgba(42,36,24,.13),0_2px_8px_rgba(42,36,24,.05)] backdrop-blur-2xl transition focus-within:border-[#e36f3f]/35 focus-within:ring-4 focus-within:ring-[#e36f3f]/[.07]">
         <Textarea ref={textareaRef} value={prompt} onChange={(event) => onPromptChange(event.target.value)} onKeyDown={handleKeyDown} disabled={loading} maxLength={2000} rows={1} placeholder="描述你想生成的画面..." aria-label="图片提示词" className="max-h-[130px] min-h-[29px] field-sizing-content border-0 bg-transparent p-0 text-[14px] leading-relaxed shadow-none focus-visible:border-0 focus-visible:ring-0" />
         <div className="mt-2.5 flex items-center justify-between">
