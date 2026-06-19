@@ -12,6 +12,15 @@ python3 -m http.server 4173
 
 然后访问 `http://localhost:4173`。
 
+## Netlify 部署
+
+该项目是纯静态网站，可直接连接 GitHub 仓库部署：
+
+- Build command：留空
+- Publish directory：`.`
+
+仓库中的 `netlify.toml` 已包含发布目录和基础安全响应头配置。
+
 ## 数据与隐私
 
 - API Key 存储在浏览器 `localStorage` 的 `haze_agnes_api_key` 键中。
