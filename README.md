@@ -1,23 +1,28 @@
 # Agnes Image Gen
 
-一个使用 Agnes Image 2.1 Flash 的浏览器端 AI 生图应用。
+一个使用 Agnes Image 2.1 Flash 的浏览器端 AI 生图应用，基于 Vite 8、React、TypeScript、Tailwind CSS v4 和 shadcn/ui 构建。
 
 ## 运行
 
-项目不需要安装依赖。在项目目录启动任意静态文件服务器：
+安装依赖并启动开发服务器：
 
 ```bash
-python3 -m http.server 4173
+npm install
+npm run dev
 ```
 
-然后访问 `http://localhost:4173`。
+构建生产版本：
+
+```bash
+npm run build
+```
 
 ## Netlify 部署
 
 该项目是纯静态网站，可直接连接 GitHub 仓库部署：
 
-- Build command：留空
-- Publish directory：`.`
+- Build command：`npm run build`
+- Publish directory：`dist`
 
 仓库中的 `netlify.toml` 已包含发布目录和基础安全响应头配置。
 
