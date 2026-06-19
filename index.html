@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="使用 Agnes Image 2.1 Flash 通过对话生成图片。" />
+    <title>Agnes Image Gen - AI 图像工作台</title>
+    <link rel="icon" type="image/png" href="./assets/haze-logo.png" />
+    <link rel="apple-touch-icon" href="./assets/haze-logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=3" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand-row">
+          <a class="brand" href="#" aria-label="Agnes Image Gen 首页">
+            <img class="brand-logo" src="./assets/haze-logo.png" alt="" />
+            <span>Agnes Image Gen</span>
+          </a>
+          <button class="icon-button mobile-only" id="closeSidebar" aria-label="关闭侧栏">
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+
+        <button class="new-chat" id="newChatButton">
+          <span class="plus">+</span>
+          <span>新的创作</span>
+          <kbd>⌘ K</kbd>
+        </button>
+
+        <nav class="history-section" aria-label="生成历史">
+          <p class="eyebrow">最近创作</p>
+          <div class="history-list" id="historyList"></div>
+          <div class="empty-history" id="emptyHistory">
+            <span class="empty-orbit"></span>
+            <p>你的灵感会出现在这里</p>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button class="settings-button" id="openSettings">
+            <span class="settings-icon" aria-hidden="true">⌘</span>
+            <span>
+              <strong>API 设置</strong>
+              <small id="keyStatus">尚未配置</small>
+            </span>
+            <span class="chevron">›</span>
+          </button>
+          <div class="local-note">
+            <span class="status-dot"></span>
+            Key 仅保存在此设备
+          </div>
+        </div>
+      </aside>
+
+      <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button class="icon-button mobile-only" id="openSidebar" aria-label="打开侧栏">
+            <span aria-hidden="true">☰</span>
+          </button>
+          <div class="model-badge">
+            <span class="model-gem" aria-hidden="true"></span>
+            <span>Agnes Image 2.1 Flash</span>
+          </div>
+          <button class="key-pill" id="topSettings">
+            <span class="key-icon" aria-hidden="true">⌁</span>
+            <span id="topKeyLabel">设置 API Key</span>
+          </button>
+        </header>
+
+        <section class="workspace" id="workspace">
+          <div class="intro" id="intro">
+            <div class="intro-mark">
+              <span></span><span></span><span></span>
+            </div>
+            <p class="intro-kicker">从一句话开始</p>
+            <h1>把脑海里的画面，<br /><em>变成真实的作品。</em></h1>
+            <p class="intro-copy">描述你想看到的场景、风格与光线，剩下的交给 Agnes。</p>
+
+            <div class="suggestion-grid" id="suggestions">
+              <button class="suggestion" data-prompt="一座漂浮在云海上的未来城市，清晨金色阳光，电影感，丰富的建筑细节，广角构图">
+                <img class="suggestion-art" src="./assets/future-city.webp" alt="" />
+                <span><strong>云上未来城</strong><small>电影感 · 建筑概念</small></span>
+              </button>
+              <button class="suggestion" data-prompt="一只坐在老式图书馆里的橘猫，戴着圆框眼镜，温暖柔和的灯光，精致故事书插画风格">
+                <img class="suggestion-art" src="./assets/orange-cat.webp" alt="" />
+                <span><strong>博学的橘猫</strong><small>插画 · 温暖叙事</small></span>
+              </button>
+              <button class="suggestion" data-prompt="生活快照风，近景特写，浅色系柔和配色，侧光拍摄，冷白皮年轻长发女子，自然妆容，上围饱满，杏色单肩系带长裙，长款耳饰，户外有翠绿植物，背景是带卷帘的田园房间，内有木质矮桌，人物与绿植、中式元素呼应，静谧雅致，温馨生活感，发丝清晰，裙装垂坠感，画面真实细腻，高画质，光影富有生活气息">
+                <img class="suggestion-art" src="./assets/live-girl.webp" alt="" />
+                <span><strong>静谧生活人像</strong><small>摄影 · 温馨生活感</small></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="conversation hidden" id="conversation" aria-live="polite"></div>
+        </section>
+
+        <div class="composer-wrap">
+          <form class="composer" id="promptForm">
+            <textarea id="promptInput" rows="1" maxlength="2000" placeholder="描述你想生成的画面..." aria-label="图片提示词"></textarea>
+            <div class="composer-bottom">
+              <div class="controls">
+                <label class="select-control">
+                  <span class="frame-icon" aria-hidden="true"></span>
+                  <select id="sizeSelect" aria-label="图片尺寸">
+                    <optgroup label="方形">
+                      <option value="1024x1024">1:1 方形</option>
+                    </optgroup>
+                    <optgroup label="横向">
+                      <option value="1024x819">5:4 横向</option>
+                      <option value="1024x768">4:3 横向</option>
+                      <option value="1152x768">3:2 横向</option>
+                      <option value="1280x800">16:10 横向</option>
+                      <option value="1280x720">16:9 宽屏</option>
+                      <option value="1344x576">21:9 超宽屏</option>
+                    </optgroup>
+                    <optgroup label="纵向">
+                      <option value="819x1024">4:5 纵向</option>
+                      <option value="768x1024">3:4 纵向</option>
+                      <option value="768x1152">2:3 纵向</option>
+                      <option value="800x1280">10:16 纵向</option>
+                      <option value="720x1280">9:16 手机竖屏</option>
+                    </optgroup>
+                  </select>
+                  <span class="select-chevron">⌄</span>
+                </label>
+                <span class="model-inline">Agnes 2.1 Flash</span>
+              </div>
+              <button class="send-button" id="sendButton" type="submit" aria-label="生成图片">
+                <span class="send-arrow">↑</span>
+                <span class="send-loader"></span>
+              </button>
+            </div>
+          </form>
+          <p class="composer-note">AI 生成内容可能存在偏差，请核对重要信息</p>
+        </div>
+      </main>
+    </div>
+
+    <dialog class="settings-modal" id="settingsModal">
+      <form method="dialog" class="settings-card" id="settingsForm">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">连接 Agnes</p>
+            <h2>配置 API Key</h2>
+          </div>
+          <button class="icon-button" id="closeSettings" type="button" aria-label="关闭设置">×</button>
+        </div>
+        <p class="modal-copy">你的 Key 只会保存在当前浏览器的 localStorage 中，并直接用于请求 Agnes API。</p>
+        <label class="field-label" for="apiKeyInput">Agnes API Key</label>
+        <div class="key-field">
+          <input id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" />
+          <button type="button" id="toggleKey" aria-label="显示或隐藏 API Key">显示</button>
+        </div>
+        <div class="privacy-box">
+          <span class="shield" aria-hidden="true">✓</span>
+          <span><strong>本地存储</strong><small>不会上传到任何第三方服务器</small></span>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="danger-button" id="clearKey">清除 Key</button>
+          <button type="submit" class="save-button" value="default">保存并继续</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status"></div>
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
