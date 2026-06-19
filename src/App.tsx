@@ -188,7 +188,7 @@ function App() {
           onDeleteHistory={deleteHistory}
         />
 
-        <main className="relative flex min-w-0 flex-col">
+        <main className="relative flex min-h-0 min-w-0 flex-col">
           <header className="flex h-[62px] shrink-0 items-center justify-between border-b border-black/10 px-4 md:h-[72px] md:px-8">
             <MobileMenuButton onClick={() => setSidebarOpen(true)} />
             <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2.5 text-sm font-medium text-[#5d5a55] md:static md:translate-x-0">
