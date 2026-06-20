@@ -1,3 +1,5 @@
+import type { ChatMessage } from "@/types"
+
 const API_BASE = import.meta.env.VITE_AGNES_API_BASE ?? "https://apihub.agnes-ai.com/v1"
 const API_ROOT = API_BASE.replace(/\/v1\/?$/, "")
 const TEXT_MODEL = import.meta.env.VITE_AGNES_TEXT_MODEL ?? "agnes-2.0-flash"
@@ -44,7 +46,7 @@ function mediaFromResponse(payload: ApiPayload, kind: "image" | "video") {
   return undefined
 }
 
-export async function generateText(prompt: string, apiKey: string) {
+export async function generateText(prompt: string, apiKey: string, history: ChatMessage[] = []) {
   const payload = await request("/chat/completions", {
     method: "POST",
     headers: headers(apiKey),
@@ -52,6 +54,7 @@ export async function generateText(prompt: string, apiKey: string) {
       model: TEXT_MODEL,
       messages: [
         { role: "system", content: "You are Agnes, a helpful, accurate, and concise AI assistant." },
+        ...history,
         { role: "user", content: prompt },
       ],
       temperature: 0.7,

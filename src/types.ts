@@ -15,6 +15,11 @@ export type ConversationEntry = GenerationRecord & {
   error?: string
 }
 
+export type ChatMessage = {
+  role: "user" | "assistant"
+  content: string
+}
+
 export type PromptSuggestion = {
   title: string
   subtitle: string

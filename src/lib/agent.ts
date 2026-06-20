@@ -1,7 +1,7 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph"
 
 import { generateImage, generateText, generateVideo } from "@/lib/agnes"
-import type { GenerationMode } from "@/types"
+import type { ChatMessage, GenerationMode } from "@/types"
 
 const AgentState = Annotation.Root({
   prompt: Annotation<string>(),
@@ -9,13 +9,14 @@ const AgentState = Annotation.Root({
   apiKey: Annotation<string>(),
   size: Annotation<string>(),
   referenceImage: Annotation<string | undefined>(),
+  history: Annotation<ChatMessage[]>(),
   text: Annotation<string | undefined>(),
   mediaUrl: Annotation<string | undefined>(),
 })
 
 const graph = new StateGraph(AgentState)
   .addNode("route", async () => ({}))
-  .addNode("write", async (state) => ({ text: await generateText(state.prompt, state.apiKey) }))
+  .addNode("write", async (state) => ({ text: await generateText(state.prompt, state.apiKey, state.history) }))
   .addNode("draw", async (state) => ({ mediaUrl: await generateImage(state.prompt, state.size, state.apiKey, state.referenceImage) }))
   .addNode("animate", async (state) => ({ mediaUrl: await generateVideo(state.prompt, state.size, state.apiKey) }))
   .addEdge(START, "route")
@@ -31,6 +32,7 @@ export function runAgnesAgent(input: {
   apiKey: string
   size: string
   referenceImage?: string
+  history?: ChatMessage[]
 }) {
-  return graph.invoke(input)
+  return graph.invoke({ ...input, history: input.history ?? [] })
 }

@@ -14,8 +14,8 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/sonner"
 import { WelcomePanel } from "@/components/welcome-panel"
 import { normalizeGenerationError } from "@/lib/agnes"
-import { clearApiKey, readApiKey, readHistory, removeHistoryItem, writeApiKey, writeHistory } from "@/lib/storage"
-import type { ConversationEntry, GenerationMode, GenerationRecord, PromptSuggestion } from "@/types"
+import { clearApiKey, clearConversation, readApiKey, readConversation, readHistory, removeHistoryItem, writeApiKey, writeConversation, writeHistory } from "@/lib/storage"
+import type { ChatMessage, ConversationEntry, GenerationMode, GenerationRecord, PromptSuggestion } from "@/types"
 
 const suggestions: PromptSuggestion[] = [
   {
@@ -41,7 +41,7 @@ const suggestions: PromptSuggestion[] = [
 function App() {
   const [apiKey, setApiKey] = useState(readApiKey)
   const [history, setHistory] = useState<GenerationRecord[]>(readHistory)
-  const [entries, setEntries] = useState<ConversationEntry[]>([])
+  const [entries, setEntries] = useState<ConversationEntry[]>(readConversation)
   const [prompt, setPrompt] = useState("")
   const [mode, setMode] = useState<GenerationMode>("image")
   const [size, setSize] = useState("1024x1024")
@@ -62,6 +62,7 @@ function App() {
       return
     }
     setEntries([])
+    clearConversation()
     setPrompt("")
     setSidebarOpen(false)
     setReferenceImage(null)
@@ -101,7 +102,10 @@ function App() {
 
   const selectHistory = (item: GenerationRecord) => {
     if (loading) return
-    setEntries([{ ...item, status: "success" }])
+    const next: ConversationEntry[] = [{ ...item, status: "success" }]
+    setEntries(next)
+    if (item.mode === "text") writeConversation(next)
+    else clearConversation()
     setSidebarOpen(false)
   }
 
@@ -142,6 +146,13 @@ function App() {
       return
     }
 
+    const history: ChatMessage[] = entries
+      .filter((entry) => entry.status === "success" && entry.mode === "text" && entry.text)
+      .slice(-10)
+      .flatMap((entry) => [
+        { role: "user" as const, content: entry.prompt },
+        { role: "assistant" as const, content: entry.text! },
+      ])
     const id = crypto.randomUUID()
     const created = Date.now()
     const pending: ConversationEntry = { id, prompt: cleanPrompt, mode, size: mode === "text" ? undefined : size, created, status: "loading" }
@@ -153,9 +164,17 @@ function App() {
 
     try {
       const { runAgnesAgent } = await import("@/lib/agent")
-      const result = await runAgnesAgent({ prompt: cleanPrompt, mode, size, apiKey, referenceImage: mode === "image" ? editingImage ?? undefined : undefined })
+      const result = await runAgnesAgent({ prompt: cleanPrompt, mode, size, apiKey, history, referenceImage: mode === "image" ? editingImage ?? undefined : undefined })
       const record: GenerationRecord = { id, prompt: cleanPrompt, mode, size: mode === "text" ? undefined : size, text: result.text, mediaUrl: result.mediaUrl, created }
-      setEntries((current) => current.map((entry) => entry.id === id ? { ...entry, text: result.text, mediaUrl: result.mediaUrl, status: "success" } : entry))
+      setEntries((current) => {
+        const next = current.map((entry) => entry.id === id ? { ...entry, text: result.text, mediaUrl: result.mediaUrl, status: "success" as const } : entry)
+        try {
+          writeConversation(next)
+        } catch {
+          toast.warning("对话记忆空间已满，本轮对话仍可继续")
+        }
+        return next
+      })
       setHistory((current) => {
         const next = [record, ...current].slice(0, 12)
         try {
