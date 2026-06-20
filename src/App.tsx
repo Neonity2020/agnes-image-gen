@@ -13,9 +13,9 @@ import { SettingsDialog } from "@/components/settings-dialog"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/sonner"
 import { WelcomePanel } from "@/components/welcome-panel"
-import { generateImage, normalizeGenerationError } from "@/lib/agnes"
+import { normalizeGenerationError } from "@/lib/agnes"
 import { clearApiKey, readApiKey, readHistory, removeHistoryItem, writeApiKey, writeHistory } from "@/lib/storage"
-import type { ConversationEntry, GenerationRecord, PromptSuggestion } from "@/types"
+import type { ConversationEntry, GenerationMode, GenerationRecord, PromptSuggestion } from "@/types"
 
 const suggestions: PromptSuggestion[] = [
   {
@@ -43,6 +43,7 @@ function App() {
   const [history, setHistory] = useState<GenerationRecord[]>(readHistory)
   const [entries, setEntries] = useState<ConversationEntry[]>([])
   const [prompt, setPrompt] = useState("")
+  const [mode, setMode] = useState<GenerationMode>("image")
   const [size, setSize] = useState("1024x1024")
   const [loading, setLoading] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -91,6 +92,7 @@ function App() {
 
   // Begin an img2img edit: seed the composer with the chosen image as reference.
   const selectEditImage = (image: string) => {
+    setMode("image")
     setReferenceImage(image)
     focusPrompt()
   }
@@ -142,7 +144,7 @@ function App() {
 
     const id = crypto.randomUUID()
     const created = Date.now()
-    const pending: ConversationEntry = { id, prompt: cleanPrompt, size, created, status: "loading" }
+    const pending: ConversationEntry = { id, prompt: cleanPrompt, mode, size: mode === "text" ? undefined : size, created, status: "loading" }
     setEntries((current) => [...current, pending])
     setPrompt("")
     const editingImage = referenceImage
@@ -150,9 +152,10 @@ function App() {
     setLoading(true)
 
     try {
-      const image = await generateImage(cleanPrompt, size, apiKey, editingImage ?? undefined)
-      const record: GenerationRecord = { id, prompt: cleanPrompt, size, image, created }
-      setEntries((current) => current.map((entry) => entry.id === id ? { ...entry, image, status: "success" } : entry))
+      const { runAgnesAgent } = await import("@/lib/agent")
+      const result = await runAgnesAgent({ prompt: cleanPrompt, mode, size, apiKey, referenceImage: mode === "image" ? editingImage ?? undefined : undefined })
+      const record: GenerationRecord = { id, prompt: cleanPrompt, mode, size: mode === "text" ? undefined : size, text: result.text, mediaUrl: result.mediaUrl, created }
+      setEntries((current) => current.map((entry) => entry.id === id ? { ...entry, text: result.text, mediaUrl: result.mediaUrl, status: "success" } : entry))
       setHistory((current) => {
         const next = [record, ...current].slice(0, 12)
         try {
@@ -173,8 +176,6 @@ function App() {
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[#f8f7f3] text-[#1d1d1b]">
-      <div className="pointer-events-none fixed right-[4%] top-[-220px] size-[460px] rounded-full bg-[radial-gradient(circle,rgba(241,185,139,.34),transparent_68%)] opacity-45" />
-      <div className="pointer-events-none fixed bottom-[-290px] left-[20%] size-[420px] rounded-full bg-[radial-gradient(circle,rgba(183,205,189,.28),transparent_66%)] opacity-45" />
       <div className="relative grid h-dvh grid-cols-1 md:grid-cols-[272px_1fr]">
         <AppSidebar
           open={sidebarOpen}
@@ -193,7 +194,7 @@ function App() {
             <MobileMenuButton onClick={() => setSidebarOpen(true)} />
             <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2.5 text-sm font-medium text-[#5d5a55] md:static md:translate-x-0">
               <span className="relative size-4 rotate-45 rounded-[5px] bg-gradient-to-br from-[#eb8556] to-[#d85b32] shadow-[0_3px_10px_rgba(218,93,49,.24)] after:absolute after:inset-1 after:rounded-sm after:bg-white/55" />
-              <span className="hidden md:inline">Agnes Image 2.1 Flash</span>
+              <span className="hidden md:inline">Agnes Agent · LangGraph.js</span>
             </div>
             <Button type="button" variant="outline" onClick={() => setSettingsOpen(true)} className={apiKey ? "rounded-full border-[#568b67]/25 bg-white/50 text-[#567a61]" : "rounded-full bg-white/50 text-[#5f5c56]"} aria-label={apiKey ? "API 已连接" : "设置 API Key"}>
               <KeyRound className="size-4" /><span className="hidden sm:inline">{apiKey ? "API 已连接" : "设置 API Key"}</span>
@@ -204,7 +205,7 @@ function App() {
             {entries.length === 0 ? <WelcomePanel suggestions={suggestions} onSelect={selectSuggestion} /> : <Conversation entries={entries} onEditImage={selectEditImage} />}
           </section>
 
-          <PromptComposer prompt={prompt} size={size} loading={loading} referenceImage={referenceImage} textareaRef={textareaRef} onPromptChange={setPrompt} onSizeChange={setSize} onRemoveReferenceImage={removeReferenceImage} onSubmit={handleSubmit} />
+          <PromptComposer prompt={prompt} mode={mode} size={size} loading={loading} referenceImage={referenceImage} textareaRef={textareaRef} onPromptChange={setPrompt} onModeChange={(nextMode) => { setMode(nextMode); if (nextMode !== "image") setReferenceImage(null) }} onSizeChange={setSize} onRemoveReferenceImage={removeReferenceImage} onSubmit={handleSubmit} />
         </main>
       </div>
 

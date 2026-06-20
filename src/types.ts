@@ -1,18 +1,17 @@
+export type GenerationMode = "text" | "image" | "video"
+
 export type GenerationRecord = {
   id: string
   prompt: string
-  size: string
-  image: string
+  mode: GenerationMode
   created: number
+  text?: string
+  mediaUrl?: string
+  size?: string
 }
 
-export type ConversationEntry = {
-  id: string
-  prompt: string
-  size: string
-  created: number
+export type ConversationEntry = GenerationRecord & {
   status: "loading" | "success" | "error"
-  image?: string
   error?: string
 }
 

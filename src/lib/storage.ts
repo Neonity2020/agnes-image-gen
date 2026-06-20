@@ -18,7 +18,11 @@ export function clearApiKey() {
 export function readHistory(): GenerationRecord[] {
   try {
     const value: unknown = JSON.parse(window.localStorage.getItem(HISTORY_STORAGE) ?? "[]")
-    return Array.isArray(value) ? (value as GenerationRecord[]).slice(0, 12) : []
+    if (!Array.isArray(value)) return []
+    return value.slice(0, 12).map((item) => {
+      const record = item as GenerationRecord & { image?: string }
+      return { ...record, mode: record.mode ?? "image", mediaUrl: record.mediaUrl ?? record.image }
+    })
   } catch {
     return []
   }

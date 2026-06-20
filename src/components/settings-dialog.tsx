@@ -30,7 +30,7 @@ export function SettingsDialog({ open, apiKey, onOpenChange, onSave, onClear }: 
         <DialogHeader className="pr-12">
           <p className="text-[13px] font-semibold uppercase tracking-[1.3px] text-[#7e7b74]">连接 Agnes</p>
           <DialogTitle>配置 API Key</DialogTitle>
-          <DialogDescription className="pt-2 text-[14px] leading-relaxed text-[#68655f]">你的 Key 只会保存在当前浏览器的 localStorage 中，并直接用于请求 Agnes API。</DialogDescription>
+          <DialogDescription className="pt-2 text-[14px] leading-relaxed text-[#68655f]">你的 Key 只会保存在当前浏览器的 localStorage 中，由 LangGraph Agent 直接用于请求 Agnes API。</DialogDescription>
         </DialogHeader>
 
         <Button asChild variant="outline" className="h-auto justify-start rounded-xl border-[#e36f3f]/20 bg-[#e36f3f]/[.065] px-3 py-3 text-[#5f514a] shadow-none hover:-translate-y-px hover:bg-[#e36f3f]/10">

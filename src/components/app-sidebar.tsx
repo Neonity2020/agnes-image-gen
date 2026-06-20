@@ -1,4 +1,4 @@
-import { ChevronRight, Command, Menu, Plus, Trash2, X } from "lucide-react"
+import { ChevronRight, Command, FileText, Image, Menu, Plus, Trash2, Video, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu"
@@ -27,13 +27,14 @@ function relativeTime(timestamp: number) {
 }
 
 export function AppSidebar({ open, apiConfigured, history, logo, onClose, onNewChat, onOpenSettings, onSelectHistory, onDeleteHistory }: AppSidebarProps) {
+  const HistoryIcon = ({ mode }: { mode: GenerationRecord["mode"] }) => mode === "text" ? <FileText className="size-4" /> : mode === "video" ? <Video className="size-4" /> : <Image className="size-4" />
   return (
     <>
       <aside className={cn("fixed inset-y-0 left-0 z-40 flex w-[272px] -translate-x-full flex-col border-r border-black/10 bg-[#efede7]/90 p-[25px_18px_18px] backdrop-blur-2xl transition-transform duration-200 md:relative md:translate-x-0", open && "translate-x-0")}>
         <div className="flex items-center justify-between px-[7px]">
-          <a href="#" aria-label="Agnes Image Gen 首页" className="inline-flex items-center gap-3 text-[19px] font-semibold tracking-[-.4px] text-[#1d1d1b] no-underline">
+          <a href="#" aria-label="Agnes Agent 首页" className="inline-flex items-center gap-3 text-[19px] font-semibold tracking-[-.4px] text-[#1d1d1b] no-underline">
             <img src={logo} alt="" className="size-8 rounded-[9px] object-cover shadow-md" />
-            <span>Agnes Image Gen</span>
+            <span>Agnes Agent</span>
           </a>
           <Button type="button" variant="outline" size="icon" onClick={onClose} className="md:hidden" aria-label="关闭侧栏"><X className="size-4" /></Button>
         </div>
@@ -58,7 +59,7 @@ export function AppSidebar({ open, apiConfigured, history, logo, onClose, onNewC
                   <ContextMenu key={item.id}>
                     <ContextMenuTrigger asChild>
                       <button type="button" onClick={() => onSelectHistory(item)} className="flex w-full items-center gap-2.5 rounded-[10px] bg-transparent p-2 text-left outline-none transition-colors hover:bg-white/65 focus-visible:ring-2 focus-visible:ring-ring/30 data-[state=open]:bg-white/65">
-                        <img src={item.image} alt="" className="size-[38px] rounded-lg bg-neutral-200 object-cover" />
+                        <span className="grid size-[38px] shrink-0 place-items-center overflow-hidden rounded-[8px] bg-white/70 text-[#77736c]">{item.mode === "image" && item.mediaUrl ? <img src={item.mediaUrl} alt="" className="size-full object-cover" /> : <HistoryIcon mode={item.mode} />}</span>
                         <span className="flex min-w-0 flex-col gap-0.5">
                           <strong className="truncate text-[14px] font-medium">{item.prompt}</strong>
                           <small className="text-[11px] text-[#85827a]">{relativeTime(item.created)}</small>

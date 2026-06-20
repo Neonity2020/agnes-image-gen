@@ -1,6 +1,23 @@
-# Agnes Image Gen
+# Agnes Agent
 
-一个使用 Agnes Image 2.1 Flash 的浏览器端 AI 生图应用，基于 Vite 8、React、TypeScript、Tailwind CSS v4 和 shadcn/ui 构建。
+一个使用 LangGraph.js 编排 Agnes 模型的浏览器端多模态 Agent，支持文生文、文生图、图生图和文生视频。基于 Vite 8、React、TypeScript、Tailwind CSS v4 和 shadcn/ui 构建。
+
+## Agent 图
+
+```text
+START -> route -> write   -> END
+               -> draw    -> END
+               -> animate -> END
+```
+
+模型可以通过环境变量配置：
+
+```bash
+VITE_AGNES_API_BASE=https://apihub.agnes-ai.com/v1
+VITE_AGNES_TEXT_MODEL=agnes-2.0-flash
+VITE_AGNES_IMAGE_MODEL=agnes-image-2.1-flash
+VITE_AGNES_VIDEO_MODEL=agnes-video-v2.0
+```
 
 ## 运行
 
