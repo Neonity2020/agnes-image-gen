@@ -23,7 +23,8 @@ type Props = {
   prompt: string
   mode: GenerationMode
   size: string
-  loading: boolean
+  activeTaskCount: number
+  maxConcurrentTasks: number
   referenceImage: string | null
   textareaRef: RefObject<HTMLTextAreaElement | null>
   onPromptChange: (value: string) => void
@@ -33,7 +34,7 @@ type Props = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }
 
-export function PromptComposer({ prompt, mode, size, loading, referenceImage, textareaRef, onPromptChange, onModeChange, onSizeChange, onRemoveReferenceImage, onSubmit }: Props) {
+export function PromptComposer({ prompt, mode, size, activeTaskCount, maxConcurrentTasks, referenceImage, textareaRef, onPromptChange, onModeChange, onSizeChange, onRemoveReferenceImage, onSubmit }: Props) {
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault()
@@ -52,7 +53,7 @@ export function PromptComposer({ prompt, mode, size, loading, referenceImage, te
             <button type="button" onClick={onRemoveReferenceImage} aria-label="移除参考图" className="grid size-7 shrink-0 place-items-center rounded-full text-[#85827b] hover:bg-black/5"><X className="size-4" /></button>
           </div>
         )}
-        <Textarea ref={textareaRef} value={prompt} onChange={(event) => onPromptChange(event.target.value)} onKeyDown={handleKeyDown} disabled={loading} maxLength={4000} rows={1} placeholder={placeholder} aria-label="创作提示词" className="max-h-[130px] min-h-[35px] field-sizing-content border-0 bg-transparent p-1 text-[14px] leading-relaxed shadow-none focus-visible:border-0 focus-visible:ring-0" />
+        <Textarea ref={textareaRef} value={prompt} onChange={(event) => onPromptChange(event.target.value)} onKeyDown={handleKeyDown} maxLength={4000} rows={1} placeholder={placeholder} aria-label="创作提示词" className="max-h-[130px] min-h-[35px] field-sizing-content border-0 bg-transparent p-1 text-[14px] leading-relaxed shadow-none focus-visible:border-0 focus-visible:ring-0" />
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="flex h-9 items-center rounded-[8px] bg-[#f0eee8] p-1" aria-label="生成模式">
@@ -65,10 +66,10 @@ export function PromptComposer({ prompt, mode, size, loading, referenceImage, te
               </Select>
             )}
           </div>
-          <Button type="submit" size="icon" disabled={loading || !prompt.trim()} className="size-9 rounded-[8px] bg-[#e36f3f] text-white hover:bg-[#c95228]" aria-label="发送给 Agnes">{loading ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}</Button>
+          <Button type="submit" size="icon" disabled={!prompt.trim() || activeTaskCount >= maxConcurrentTasks} className="size-9 rounded-[8px] bg-[#e36f3f] text-white hover:bg-[#c95228]" aria-label="发送给 Agnes"><ArrowUp className="size-4" /></Button>
         </div>
       </form>
-      <p className="mt-2 text-center text-[11px] text-[#89867f]">AI 生成内容可能存在偏差，请核对重要信息</p>
+      <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[11px] text-[#89867f]">{activeTaskCount > 0 && <><LoaderCircle className="size-3 animate-spin text-[#e36f3f]" /><span>{activeTaskCount} 个任务正在并行处理 ·</span></>}<span>AI 生成内容可能存在偏差，请核对重要信息</span></p>
     </div>
   )
 }

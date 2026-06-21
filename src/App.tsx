@@ -38,6 +38,8 @@ const suggestions: PromptSuggestion[] = [
   },
 ]
 
+const MAX_CONCURRENT_TASKS = 4
+
 function App() {
   const [apiKey, setApiKey] = useState(readApiKey)
   const [history, setHistory] = useState<GenerationRecord[]>(readHistory)
@@ -45,7 +47,7 @@ function App() {
   const [prompt, setPrompt] = useState("")
   const [mode, setMode] = useState<GenerationMode>("image")
   const [size, setSize] = useState("1024x1024")
-  const [loading, setLoading] = useState(false)
+  const [activeTaskCount, setActiveTaskCount] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [referenceImage, setReferenceImage] = useState<string | null>(null)
@@ -57,17 +59,13 @@ function App() {
   }, [])
 
   const resetConversation = useCallback(() => {
-    if (loading) {
-      toast.info("图片生成完成后即可开始新的创作")
-      return
-    }
     setEntries([])
     clearConversation()
     setPrompt("")
     setSidebarOpen(false)
     setReferenceImage(null)
     focusPrompt()
-  }, [focusPrompt, loading])
+  }, [focusPrompt])
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -101,7 +99,6 @@ function App() {
   const removeReferenceImage = () => setReferenceImage(null)
 
   const selectHistory = (item: GenerationRecord) => {
-    if (loading) return
     const next: ConversationEntry[] = [{ ...item, status: "success" }]
     setEntries(next)
     if (item.mode === "text") writeConversation(next)
@@ -139,7 +136,11 @@ function App() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const cleanPrompt = prompt.trim()
-    if (!cleanPrompt || loading) return
+    if (!cleanPrompt) return
+    if (activeTaskCount >= MAX_CONCURRENT_TASKS) {
+      toast.info(`最多同时执行 ${MAX_CONCURRENT_TASKS} 个任务`)
+      return
+    }
     if (!apiKey) {
       setSettingsOpen(true)
       toast.info("请先配置 Agnes API Key")
@@ -160,7 +161,7 @@ function App() {
     setPrompt("")
     const editingImage = referenceImage
     setReferenceImage(null)
-    setLoading(true)
+    setActiveTaskCount((current) => current + 1)
 
     try {
       const { runAgnesAgent } = await import("@/lib/agent")
@@ -188,7 +189,7 @@ function App() {
       const message = normalizeGenerationError(error)
       setEntries((current) => current.map((entry) => entry.id === id ? { ...entry, status: "error", error: message } : entry))
     } finally {
-      setLoading(false)
+      setActiveTaskCount((current) => Math.max(0, current - 1))
       focusPrompt()
     }
   }
@@ -224,7 +225,7 @@ function App() {
             {entries.length === 0 ? <WelcomePanel suggestions={suggestions} onSelect={selectSuggestion} /> : <Conversation entries={entries} onEditImage={selectEditImage} />}
           </section>
 
-          <PromptComposer prompt={prompt} mode={mode} size={size} loading={loading} referenceImage={referenceImage} textareaRef={textareaRef} onPromptChange={setPrompt} onModeChange={(nextMode) => { setMode(nextMode); if (nextMode !== "image") setReferenceImage(null) }} onSizeChange={setSize} onRemoveReferenceImage={removeReferenceImage} onSubmit={handleSubmit} />
+          <PromptComposer prompt={prompt} mode={mode} size={size} activeTaskCount={activeTaskCount} maxConcurrentTasks={MAX_CONCURRENT_TASKS} referenceImage={referenceImage} textareaRef={textareaRef} onPromptChange={setPrompt} onModeChange={(nextMode) => { setMode(nextMode); if (nextMode !== "image") setReferenceImage(null) }} onSizeChange={setSize} onRemoveReferenceImage={removeReferenceImage} onSubmit={handleSubmit} />
         </main>
       </div>
 
