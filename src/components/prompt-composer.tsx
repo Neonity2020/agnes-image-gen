@@ -1,5 +1,6 @@
-import { ArrowUp, Frame, Image, LoaderCircle, MessageSquareText, Video, X } from "lucide-react"
-import type { FormEvent, KeyboardEvent, RefObject } from "react"
+import { ArrowUp, Frame, Image, ImagePlus, LoaderCircle, MessageSquareText, Video, X } from "lucide-react"
+import { type ChangeEvent, type FormEvent, type KeyboardEvent, type RefObject, useRef } from "react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -19,6 +20,9 @@ const modes = [
   { value: "video" as const, label: "视频", icon: Video },
 ]
 
+const MAX_REFERENCE_IMAGE_SIZE = 10 * 1024 * 1024
+const REFERENCE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
+
 type Props = {
   prompt: string
   mode: GenerationMode
@@ -30,17 +34,44 @@ type Props = {
   onPromptChange: (value: string) => void
   onModeChange: (value: GenerationMode) => void
   onSizeChange: (value: string) => void
+  onReferenceImageChange: (value: string) => void
   onRemoveReferenceImage: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }
 
-export function PromptComposer({ prompt, mode, size, activeTaskCount, maxConcurrentTasks, referenceImage, textareaRef, onPromptChange, onModeChange, onSizeChange, onRemoveReferenceImage, onSubmit }: Props) {
+export function PromptComposer({ prompt, mode, size, activeTaskCount, maxConcurrentTasks, referenceImage, textareaRef, onPromptChange, onModeChange, onSizeChange, onReferenceImageChange, onRemoveReferenceImage, onSubmit }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault()
       event.currentTarget.form?.requestSubmit()
     }
   }
+
+  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+    if (!REFERENCE_IMAGE_TYPES.has(file.type)) {
+      toast.error("请选择 PNG、JPEG 或 WebP 图片")
+      return
+    }
+    if (file.size > MAX_REFERENCE_IMAGE_SIZE) {
+      toast.error("参考图不能超过 10 MB")
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return
+      onReferenceImageChange(reader.result)
+      toast.success("参考图已添加")
+    }
+    reader.onerror = () => toast.error("图片读取失败，请重新选择")
+    reader.readAsDataURL(file)
+  }
+
   const placeholder = mode === "text" ? "让 Agnes 写点什么..." : mode === "video" ? "描述你想生成的视频镜头..." : referenceImage ? "描述要改变什么、保留什么..." : "描述你想生成的画面..."
 
   return (
@@ -55,7 +86,8 @@ export function PromptComposer({ prompt, mode, size, activeTaskCount, maxConcurr
         )}
         <Textarea ref={textareaRef} value={prompt} onChange={(event) => onPromptChange(event.target.value)} onKeyDown={handleKeyDown} maxLength={4000} rows={1} placeholder={placeholder} aria-label="创作提示词" className="max-h-[130px] min-h-[35px] field-sizing-content border-0 bg-transparent p-1 text-[14px] leading-relaxed shadow-none focus-visible:border-0 focus-visible:ring-0" />
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageUpload} className="sr-only" aria-label="上传参考图" />
             <div className="flex h-9 items-center rounded-[8px] bg-[#f0eee8] p-1" aria-label="生成模式">
               {modes.map((item) => <button key={item.value} type="button" onClick={() => onModeChange(item.value)} className={cn("flex h-7 items-center gap-1.5 rounded-[6px] px-2 text-xs text-[#716e68] transition", mode === item.value && "bg-white font-medium text-[#262520] shadow-sm")}><item.icon className="size-3.5" />{item.label}</button>)}
             </div>
@@ -65,6 +97,7 @@ export function PromptComposer({ prompt, mode, size, activeTaskCount, maxConcurr
                 <SelectContent>{sizeGroups.map((group, index) => <SelectGroup key={group.label}><SelectLabel>{group.label}</SelectLabel>{group.items.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}{index < sizeGroups.length - 1 && <SelectSeparator />}</SelectGroup>)}</SelectContent>
               </Select>
             )}
+            {mode === "image" && <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="h-9 rounded-[8px] px-2.5 text-[13px]" aria-label={referenceImage ? "替换参考图" : "上传参考图"}><ImagePlus className="size-4 text-[#85827b]" /><span className="hidden sm:inline">{referenceImage ? "替换" : "上传"}</span></Button>}
           </div>
           <Button type="submit" size="icon" disabled={!prompt.trim() || activeTaskCount >= maxConcurrentTasks} className="size-9 rounded-[8px] bg-[#e36f3f] text-white hover:bg-[#c95228]" aria-label="发送给 Agnes"><ArrowUp className="size-4" /></Button>
         </div>

@@ -225,7 +225,7 @@ function App() {
             {entries.length === 0 ? <WelcomePanel suggestions={suggestions} onSelect={selectSuggestion} /> : <Conversation entries={entries} onEditImage={selectEditImage} />}
           </section>
 
-          <PromptComposer prompt={prompt} mode={mode} size={size} activeTaskCount={activeTaskCount} maxConcurrentTasks={MAX_CONCURRENT_TASKS} referenceImage={referenceImage} textareaRef={textareaRef} onPromptChange={setPrompt} onModeChange={(nextMode) => { setMode(nextMode); if (nextMode !== "image") setReferenceImage(null) }} onSizeChange={setSize} onRemoveReferenceImage={removeReferenceImage} onSubmit={handleSubmit} />
+          <PromptComposer prompt={prompt} mode={mode} size={size} activeTaskCount={activeTaskCount} maxConcurrentTasks={MAX_CONCURRENT_TASKS} referenceImage={referenceImage} textareaRef={textareaRef} onPromptChange={setPrompt} onModeChange={(nextMode) => { setMode(nextMode); if (nextMode !== "image") setReferenceImage(null) }} onSizeChange={setSize} onReferenceImageChange={setReferenceImage} onRemoveReferenceImage={removeReferenceImage} onSubmit={handleSubmit} />
         </main>
       </div>
 
