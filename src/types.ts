@@ -15,6 +15,14 @@ export type ConversationEntry = GenerationRecord & {
   error?: string
 }
 
+export type Conversation = {
+  id: string
+  title: string
+  created: number
+  updated: number
+  entries: ConversationEntry[]
+}
+
 export type ChatMessage = {
   role: "user" | "assistant"
   content: string

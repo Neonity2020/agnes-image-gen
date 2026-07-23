@@ -14,8 +14,8 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/sonner"
 import { WelcomePanel } from "@/components/welcome-panel"
 import { normalizeGenerationError } from "@/lib/agnes"
-import { clearApiKey, clearConversation, readApiKey, readConversation, readHistory, removeHistoryItem, writeApiKey, writeConversation, writeHistory } from "@/lib/storage"
-import type { ChatMessage, ConversationEntry, GenerationMode, GenerationRecord, PromptSuggestion } from "@/types"
+import { clearApiKey, readApiKey, readConversations, writeApiKey, writeConversations } from "@/lib/storage"
+import type { ChatMessage, ConversationEntry, GenerationMode, PromptSuggestion } from "@/types"
 
 const suggestions: PromptSuggestion[] = [
   {
@@ -42,8 +42,8 @@ const MAX_CONCURRENT_TASKS = 4
 
 function App() {
   const [apiKey, setApiKey] = useState(readApiKey)
-  const [history, setHistory] = useState<GenerationRecord[]>(readHistory)
-  const [entries, setEntries] = useState<ConversationEntry[]>(readConversation)
+  const [conversations, setConversations] = useState(readConversations)
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(() => readConversations()[0]?.id ?? null)
   const [prompt, setPrompt] = useState("")
   const [mode, setMode] = useState<GenerationMode>("image")
   const [size, setSize] = useState("1024x1024")
@@ -53,14 +53,16 @@ function App() {
   const [referenceImage, setReferenceImage] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const workspaceRef = useRef<HTMLElement>(null)
+  const hasPersistedConversations = useRef(false)
+  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId)
+  const entries = activeConversation?.entries ?? []
 
   const focusPrompt = useCallback(() => {
     window.requestAnimationFrame(() => textareaRef.current?.focus())
   }, [])
 
   const resetConversation = useCallback(() => {
-    setEntries([])
-    clearConversation()
+    setActiveConversationId(null)
     setPrompt("")
     setSidebarOpen(false)
     setReferenceImage(null)
@@ -77,6 +79,18 @@ function App() {
     window.addEventListener("keydown", handleShortcut)
     return () => window.removeEventListener("keydown", handleShortcut)
   }, [resetConversation])
+
+  useEffect(() => {
+    if (!hasPersistedConversations.current) {
+      hasPersistedConversations.current = true
+      return
+    }
+    try {
+      writeConversations(conversations)
+    } catch {
+      toast.warning("对话记忆空间已满，本轮对话仍可继续")
+    }
+  }, [conversations])
 
   useEffect(() => {
     window.requestAnimationFrame(() => {
@@ -98,21 +112,18 @@ function App() {
 
   const removeReferenceImage = () => setReferenceImage(null)
 
-  const selectHistory = (item: GenerationRecord) => {
-    const next: ConversationEntry[] = [{ ...item, status: "success" }]
-    setEntries(next)
-    if (item.mode === "text") writeConversation(next)
-    else clearConversation()
+  const selectConversation = (conversationId: string) => {
+    setActiveConversationId(conversationId)
     setSidebarOpen(false)
   }
 
-  const deleteHistory = (id: string) => {
-    setHistory((current) => {
-      const next = current.filter((item) => item.id !== id)
-      removeHistoryItem(id)
+  const deleteConversation = (id: string) => {
+    setConversations((current) => {
+      const next = current.filter((conversation) => conversation.id !== id)
+      if (activeConversationId === id) setActiveConversationId(next[0]?.id ?? null)
       return next
     })
-    toast.success("已删除该创作")
+    toast.success("已删除该对话")
   }
 
   const saveKey = (value: string) => {
@@ -157,7 +168,16 @@ function App() {
     const id = crypto.randomUUID()
     const created = Date.now()
     const pending: ConversationEntry = { id, prompt: cleanPrompt, mode, size: mode === "text" ? undefined : size, created, status: "loading" }
-    setEntries((current) => [...current, pending])
+    const conversationId = activeConversationId ?? crypto.randomUUID()
+    setConversations((current) => {
+      const existing = current.find((conversation) => conversation.id === conversationId)
+      if (!existing) {
+        return [{ id: conversationId, title: cleanPrompt.slice(0, 48), created, updated: created, entries: [pending] }, ...current]
+      }
+      const updated = { ...existing, updated: created, entries: [...existing.entries, pending] }
+      return [updated, ...current.filter((conversation) => conversation.id !== conversationId)]
+    })
+    setActiveConversationId(conversationId)
     setPrompt("")
     const editingImage = referenceImage
     setReferenceImage(null)
@@ -166,28 +186,20 @@ function App() {
     try {
       const { runAgnesAgent } = await import("@/lib/agent")
       const result = await runAgnesAgent({ prompt: cleanPrompt, mode, size, apiKey, history, referenceImage: mode === "image" ? editingImage ?? undefined : undefined })
-      const record: GenerationRecord = { id, prompt: cleanPrompt, mode, size: mode === "text" ? undefined : size, text: result.text, mediaUrl: result.mediaUrl, created }
-      setEntries((current) => {
-        const next = current.map((entry) => entry.id === id ? { ...entry, text: result.text, mediaUrl: result.mediaUrl, status: "success" as const } : entry)
-        try {
-          writeConversation(next)
-        } catch {
-          toast.warning("对话记忆空间已满，本轮对话仍可继续")
-        }
-        return next
-      })
-      setHistory((current) => {
-        const next = [record, ...current].slice(0, 12)
-        try {
-          writeHistory(next)
-        } catch {
-          toast.warning("历史记录空间已满，图片仍可正常使用")
-        }
-        return next
+      setConversations((current) => {
+        return current.map((conversation) => conversation.id === conversationId ? {
+          ...conversation,
+          updated: Date.now(),
+          entries: conversation.entries.map((entry) => entry.id === id ? { ...entry, text: result.text, mediaUrl: result.mediaUrl, status: "success" as const } : entry),
+        } : conversation)
       })
     } catch (error) {
       const message = normalizeGenerationError(error)
-      setEntries((current) => current.map((entry) => entry.id === id ? { ...entry, status: "error", error: message } : entry))
+      setConversations((current) => current.map((conversation) => conversation.id === conversationId ? {
+        ...conversation,
+        updated: Date.now(),
+        entries: conversation.entries.map((entry) => entry.id === id ? { ...entry, status: "error", error: message } : entry),
+      } : conversation))
     } finally {
       setActiveTaskCount((current) => Math.max(0, current - 1))
       focusPrompt()
@@ -200,13 +212,13 @@ function App() {
         <AppSidebar
           open={sidebarOpen}
           apiConfigured={Boolean(apiKey)}
-          history={history}
+          conversations={conversations}
           logo={logo}
           onClose={() => setSidebarOpen(false)}
           onNewChat={resetConversation}
           onOpenSettings={() => setSettingsOpen(true)}
-          onSelectHistory={selectHistory}
-          onDeleteHistory={deleteHistory}
+          onSelectConversation={(conversation) => selectConversation(conversation.id)}
+          onDeleteConversation={deleteConversation}
         />
 
         <main className="relative flex min-h-0 min-w-0 flex-col">
