@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 9 章：浏览器持久化与数据迁移</title><style>body{max-width:900px;margin:48px auto;padding:0 24px 80px;color:#24221f;font:17px/1.75 system-ui,-apple-system,sans-serif}h1,h2{line-height:1.25;color:#1d1d1b}h1{font-size:2.25rem}h2{margin-top:2.4rem}pre{overflow:auto;border-radius:12px;padding:18px;background:#24221f;color:#f7f4ef;font:14px/1.6 ui-monospace,monospace}code{background:#f1efea;border-radius:4px;padding:2px 5px}pre code{background:transparent;padding:0}.note{border-left:4px solid #d85b32;background:#fff7f2;padding:8px 16px}.exercise{border:1px solid #ddd7cf;border-radius:12px;padding:18px 20px}a{color:#b64624}</style><article>
+<p><a href="../course-outline.md">← 课程大纲</a> · <a href="../reference/local-storage-contract.html">本地存储契约</a> · <a href="0008-multi-turn-conversations.html">上一章</a></p>
+<h1>第 9 章：浏览器持久化与数据迁移</h1><p>目标：关闭或刷新页面后仍能恢复会话；面对空间不足、损坏 JSON 和旧版数据时，应用保持可用而不是崩溃。</p>
+<h2>1. localStorage 是便利的本地数据库，不是可信数据源</h2><p>浏览器可以被用户修改、旧版本可以留下不同结构、写入还可能因配额失败。因此不要直接把 <code>JSON.parse(...)</code> 的结果断言成 <code>Conversation[]</code>。正确顺序是：读取字符串、try/catch 解析、检查顶层类型、逐条规范化、丢弃无效值、限制数量。</p><pre><code>export function readConversations(): Conversation[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(CONVERSATIONS_STORAGE) ?? "null")
+    if (Array.isArray(value)) {
+      return value.map(normalizeConversation)
+        .filter((item): item is Conversation =&gt; item !== null)
+        .sort((a, b) =&gt; b.updated - a.updated)
+        .slice(0, MAX_CONVERSATIONS)
+    }
+  } catch { /* fall through */ }
+  return legacyConversations()
+}</code></pre>
+<h2>2. 用运行时校验修复 TypeScript 的盲区</h2><p>TypeScript 类型只在编译时存在；<code>localStorage</code> 返回的是未知 JSON。规范化函数至少检查会话 ID、标题、时间戳、entries 数组，并对每个 entry 调用类型守卫：</p><pre><code>function normalizeConversation(value: unknown): Conversation | null {
+  if (!value || typeof value !== "object") return null
+  const item = value as Partial&lt;Conversation&gt;
+  if (typeof item.id !== "string" || typeof item.title !== "string" ||
+      typeof item.created !== "number" || typeof item.updated !== "number" ||
+      !Array.isArray(item.entries)) return null
+  return { ...item, entries: item.entries.filter(isConversationEntry).slice(-MAX_ENTRIES_PER_CONVERSATION) } as Conversation
+}</code></pre><p>生产代码可避免最后的断言，逐字段重新构造对象。重点是不要信任持久化的嵌套数组。</p>
+<h2>3. 限制数据，才能有可预测的体验</h2><p>本项目最多保留 30 条会话、每条会话最多 50 条 entry。写入前再次应用限制并按 <code>updated</code> 倒序，以确保“最近对话”与实际存储一致：</p><pre><code>const value = conversations
+  .map((conversation) =&gt; ({ ...conversation,
+    entries: conversation.entries.slice(-MAX_ENTRIES_PER_CONVERSATION) }))
+  .sort((a, b) =&gt; b.updated - a.updated)
+  .slice(0, MAX_CONVERSATIONS)
+localStorage.setItem(CONVERSATIONS_STORAGE, JSON.stringify(value))</code></pre><p>图像 Data URL 很大，特别容易触发配额。写入应包在 <code>try/catch</code> 中：内存里的本轮对话仍可继续，UI 用 Toast 提醒用户本地记忆未保存。</p>
+<h2>4. 迁移要读取旧格式，而不是删除旧用户数据</h2><p>从“一个活动文本数组 + 扁平生成历史”迁到 <code>Conversation[]</code> 时，读取函数先检测新版 key。不存在时：</p><ol><li>将旧活动文本条目合成一个 legacy 会话。</li><li>将未包含在活动会话中的旧历史记录分别转成单条会话。</li><li>以更新时间排序、去除重复 ID，并应用同样的上限。</li></ol><p>之后任一次新的会话状态写入都会落到新版 key。迁移只需发生在读取边界，React 组件从始至终只看到新版 <code>Conversation[]</code>。</p><p class="note">不要在渲染组件中写 migration。迁移是存储格式适配，应该集中在 <code>src/lib/storage.ts</code>；这样更容易删除旧支持，也便于单独测试。</p>
+<h2>5. API Key 的现实边界</h2><p>API Key 也保存在 localStorage，方便同一设备复用，但它并不“安全保存”：任何能在该站点执行的脚本都有读取可能。教程应明确告知读者：这是个人原型的便利设计；面向多人生产环境时应使用服务端、受限 token 或 OAuth。</p>
+<h2>动手练习</h2><div class="exercise"><ol><li>在 DevTools Application 面板手动写入无效 JSON，刷新后确认应用显示空状态而非白屏。</li><li>写入一个缺少 <code>updated</code> 的对象，确认规范化函数丢弃它。</li><li>创建超过上限的假会话，验证只保留更新时间最新的一批。</li><li>模拟 <code>localStorage.setItem</code> 抛错，确认本轮 UI 仍可看到生成结果。</li><li>准备旧格式 key，验证首次加载能看到转换后的线程。</li></ol><p><strong>自检：</strong>若某段读取代码使用 <code>JSON.parse(...) as Conversation[]</code>，它只是在隐藏坏数据；应改为运行时校验。</p></div>
+<h2>下一章</h2><p>第 10 章将完成质量验证、构建、包体积检查和 Netlify 静态部署，形成可公开发布的复刻项目。</p><h2>延伸阅读</h2><p>主参考：<a href="https://developer.mozilla.org/docs/Web/API/Window/localStorage">MDN localStorage</a>，了解 API 的作用域、持久性和异常行为。</p></article></html>

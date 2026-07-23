@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>项目初始化检查表</title>
+  <style>body{max-width:760px;margin:48px auto;padding:0 24px;font:16px/1.7 system-ui,sans-serif;color:#24221f}h1{line-height:1.2}li{margin:.55rem 0}code{background:#f2f0eb;border-radius:4px;padding:2px 5px}</style>
+  <h1>项目初始化检查表</h1>
+  <ol>
+    <li>Node.js 满足项目要求：<code>&gt;=20.19.0 || &gt;=22.12.0</code>。</li>
+    <li>使用 <code>pnpm create vite@latest</code> 创建 <code>react-ts</code> 项目。</li>
+    <li>安装 React、TypeScript、Vite、<code>@vitejs/plugin-react</code>、Tailwind v4 与 <code>@tailwindcss/vite</code>。</li>
+    <li>在 <code>vite.config.ts</code> 注册 React 和 Tailwind 插件。</li>
+    <li>为 <code>@/*</code> 同时配置 Vite alias 与 TypeScript <code>paths</code>。</li>
+    <li>建立 <code>src/components</code>、<code>src/lib</code> 和 <code>src/types.ts</code>。</li>
+    <li>运行 <code>pnpm typecheck</code>、<code>pnpm build</code>，两者均成功后再进入 UI 开发。</li>
+  </ol>
+</html>

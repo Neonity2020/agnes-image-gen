@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 8 章：实现多轮对话与线程管理</title><style>body{max-width:900px;margin:48px auto;padding:0 24px 80px;color:#24221f;font:17px/1.75 system-ui,-apple-system,sans-serif}h1,h2{line-height:1.25;color:#1d1d1b}h1{font-size:2.25rem}h2{margin-top:2.4rem}pre{overflow:auto;border-radius:12px;padding:18px;background:#24221f;color:#f7f4ef;font:14px/1.6 ui-monospace,monospace}code{background:#f1efea;border-radius:4px;padding:2px 5px}pre code{background:transparent;padding:0}.note{border-left:4px solid #d85b32;background:#fff7f2;padding:8px 16px}.exercise{border:1px solid #ddd7cf;border-radius:12px;padding:18px 20px}a{color:#b64624}</style><article>
+<p><a href="../course-outline.md">← 课程大纲</a> · <a href="../reference/conversation-invariants.html">会话线程不变量</a> · <a href="0007-conversation-and-media-rendering.html">上一章</a></p>
+<h1>第 8 章：实现多轮对话与线程管理</h1><p>目标：让用户在同一线程中连续提问并获得上下文相关回答，同时可以新建、切换、删除和恢复不同会话，且并发生成不会串线。</p>
+<h2>1. 为什么“生成历史数组”不够</h2><p>把每一次生成单独放入 <code>GenerationRecord[]</code>，侧栏点击时只能恢复一条记录，模型也无法知道它前面的问答。多轮功能需要把“会话”提升为一等领域对象：</p><pre><code>type Conversation = {
+  id: string
+  title: string
+  created: number
+  updated: number
+  entries: ConversationEntry[]
+}</code></pre><p><code>ConversationEntry</code> 仍然是第 4、7 章中的单次任务；<code>Conversation</code> 负责把它们按线程组织。标题使用首条提示词的截断文本，<code>updated</code> 供侧栏排序。</p>
+<h2>2. 只有一个活动线程</h2><p><code>App</code> 维护完整的 <code>conversations</code> 和可空的 <code>activeConversationId</code>：</p><pre><code>const [conversations, setConversations] = useState(readConversations)
+const [activeConversationId, setActiveConversationId] = useState&lt;string | null&gt;(null)
+const activeConversation = conversations.find((item) =&gt; item.id === activeConversationId)
+const entries = activeConversation?.entries ?? []</code></pre><p>会话区只接收 <code>entries</code>。点击侧栏只改变 ID；它不复制 entries，也不重新组织 history。点击“新的创作”将活动 ID 设为 <code>null</code>，不会删除以前的对话；第一次发送时才真正创建新线程。</p>
+<h2>3. 从当前线程提取模型上下文</h2><p>文本模型需要 user/assistant 交替消息，但界面条目同时包含图片、视频、失败和加载状态。提交时只从当前条目中选取成功的文本结果，并限制最近 10 轮：</p><pre><code>const history: ChatMessage[] = entries
+  .filter((entry) =&gt; entry.status === "success" &amp;&amp; entry.mode === "text" &amp;&amp; entry.text)
+  .slice(-10)
+  .flatMap((entry) =&gt; [
+    { role: "user" as const, content: entry.prompt },
+    { role: "assistant" as const, content: entry.text! },
+  ])</code></pre><p>这刻意排除了图片、视频和失败任务。它们仍在视觉会话中，却没有满足文本聊天协议所需的 assistant 回复格式。</p>
+<h2>4. 首条消息创建线程，后续消息追加</h2><p>发送时先固定线程 ID。没有活动线程就生成一个；有则复用。接着将 pending 条目追加，并把最新活动线程移到数组开头：</p><pre><code>const conversationId = activeConversationId ?? crypto.randomUUID()
+const existing = current.find((item) =&gt; item.id === conversationId)
+if (!existing) {
+  return [{ id: conversationId, title: cleanPrompt.slice(0, 48),
+    created, updated: created, entries: [pending] }, ...current]
+}
+const updated = { ...existing, updated: created, entries: [...existing.entries, pending] }
+return [updated, ...current.filter((item) =&gt; item.id !== conversationId)]</code></pre>
+<h2>5. 并发时必须按两个 ID 回写</h2><p>这是多线程最容易出错的位置。任务请求开始后，用户可能切到别的对话甚至新建一条。完成处理绝不能读取那时的 <code>activeConversationId</code>；它应闭包捕获提交时的 <code>conversationId</code>，再在该线程中用 <code>entry.id</code> 找到占位条目。</p><pre><code>setConversations((current) =&gt; current.map((conversation) =&gt;
+  conversation.id === conversationId ? {
+    ...conversation, updated: Date.now(),
+    entries: conversation.entries.map((entry) =&gt;
+      entry.id === id ? { ...entry, status: "success", text: result.text } : entry),
+  } : conversation,
+))</code></pre><p class="note">失败路径必须使用完全相同的定位规则。若只在成功时正确回写，网络异常时就会污染当前线程或留下永久 loading 条目。</p>
+<h2>6. 侧栏与线程操作</h2><p>侧栏显示一个 <code>Conversation[]</code>，标题来自 <code>conversation.title</code>，时间来自 <code>conversation.updated</code>。选择会话只执行 <code>setActiveConversationId(id)</code>；删除会话从数组过滤它，如果删除的是当前线程，则选择下一个线程或回到空状态。不要将“删除侧栏项”实现为删除某一条 entry。</p>
+<h2>动手练习</h2><div class="exercise"><ol><li>将旧的扁平历史改为 <code>Conversation[]</code>，实现空状态、新建、选择与删除。</li><li>连续完成三轮文本问答，检查第三次 API 请求携带前两轮 user/assistant 消息。</li><li>在 A 线程发起慢任务，立即切到 B 线程发起另一任务；确认两个结果分别回写。</li><li>在线程中插入一次图片生成，验证下一次文本请求不包含图片条目。</li></ol><p><strong>自检：</strong>如果切换侧栏后模型继续引用上一条线程，检查 history 是否从 <code>entries</code>（当前活动线程）构造，而不是从所有 conversations 扁平化构造。</p></div>
+<h2>下一章</h2><p>第 9 章将把这些线程可靠写入浏览器 localStorage，并处理容量、无效 JSON 和旧数据迁移。</p><h2>延伸阅读</h2><p>主参考：<a href="https://react.dev/learn/updating-arrays-in-state">React 官方数组状态更新指南</a>，重点理解不可变地更新嵌套数组与对象。</p></article></html>

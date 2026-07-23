@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第 3 章：搭建创作工作台界面</title>
+  <style>body{max-width:900px;margin:48px auto;padding:0 24px 80px;color:#24221f;font:17px/1.75 system-ui,-apple-system,sans-serif}h1,h2{line-height:1.25;color:#1d1d1b}h1{font-size:2.25rem}h2{margin-top:2.4rem}pre{overflow:auto;border-radius:12px;padding:18px;background:#24221f;color:#f7f4ef;font:14px/1.6 ui-monospace,monospace}code{background:#f1efea;border-radius:4px;padding:2px 5px}pre code{padding:0;background:transparent}.note{border-left:4px solid #d85b32;background:#fff7f2;padding:8px 16px}.exercise{border:1px solid #ddd7cf;border-radius:12px;padding:18px 20px}a{color:#b64624}</style>
+  <article>
+    <p><a href="../course-outline.md">← 课程大纲</a> · <a href="../reference/ui-component-map.html">组件职责速查表</a> · <a href="0002-vite-react-typescript-setup.html">上一章</a></p>
+    <h1>第 3 章：搭建创作工作台界面</h1>
+    <p>目标：将空白 React 页面变成一个有明确层次的创作工作台，并让每个 UI 模块只负责一种用户可见的工作。</p>
+
+    <h2>1. 先划分页面，而不是先写样式</h2>
+    <p>目标应用只有三块长期存在的区域：左侧历史导航、可滚动的创作工作区、固定在底部的提示词编辑器。<code>App</code> 负责把它们排成布局并传入状态；每个区域的内部视觉与交互留在自己的组件文件。</p>
+    <pre><code>&lt;div className="grid h-dvh grid-cols-1 md:grid-cols-[272px_1fr]"&gt;
+  &lt;AppSidebar ... /&gt;
+  &lt;main className="relative flex min-h-0 min-w-0 flex-col"&gt;
+    &lt;header&gt;...&lt;/header&gt;
+    &lt;section className="min-h-0 flex-1 overflow-y-auto"&gt;...&lt;/section&gt;
+    &lt;PromptComposer ... /&gt;
+  &lt;/main&gt;
+&lt;/div&gt;</code></pre>
+    <p>这里的 <code>min-h-0</code> 很重要：在 flex/grid 子项中，它允许中间区域缩小并由自己滚动，避免长对话把整个页面顶出视口。</p>
+
+    <h2>2. 用状态驱动“空页”与“对话页”</h2>
+    <p>工作区不应维护一套独立的显示状态。它只根据当前线程的 <code>entries</code> 选择两个组件：</p>
+    <pre><code>{entries.length === 0
+  ? &lt;WelcomePanel suggestions={suggestions} onSelect={selectSuggestion} /&gt;
+  : &lt;Conversation entries={entries} onEditImage={selectEditImage} /&gt;}</code></pre>
+    <p><code>WelcomePanel</code> 只负责把预设提示词回传给父级；<code>Conversation</code> 只渲染已有条目。这让“是否存在对话”只有一个事实来源。</p>
+
+    <h2>3. 组件接口要表达意图，而不是泄露父级状态</h2>
+    <p>以侧栏为例，它接收 <code>conversations</code> 来展示列表，却不直接修改会话数组；它通过 <code>onNewChat</code>、<code>onSelectConversation</code>、<code>onDeleteConversation</code> 表达用户意图。父级 <code>App</code> 决定状态如何变化和如何持久化。</p>
+    <p class="note">这不是“所有状态都塞进 App”的教条。这里状态确实被侧栏、会话区、编辑器共同使用，放在它们最近的共同父级能避免多个副本失去同步。</p>
+
+    <h2>4. 复用 shadcn/ui 原语</h2>
+    <p>将按钮、输入框、选择器、弹窗、滚动区域放在 <code>src/components/ui</code>。业务组件组合这些原语，不重复处理基础样式、焦点环或键盘交互：</p>
+    <ul><li><code>Button</code>：发送、下载、删除与图生图操作。</li><li><code>Select</code>：图像/视频尺寸选择。</li><li><code>Dialog</code>：API Key 设置。</li><li><code>ScrollArea</code>：侧栏中的会话列表。</li><li><code>ContextMenu</code>：对话删除入口。</li></ul>
+    <p>先完成语义正确的 HTML 和可访问名称（例如 <code>aria-label="发送给 Agnes"</code>），再调整颜色、圆角和阴影。视觉相同但无法键盘操作的组件不算完成。</p>
+
+    <h2>5. 构建提示词编辑器的四类输入</h2>
+    <p><code>PromptComposer</code> 是受控组件：提示词、模式、尺寸和参考图都从父级传入，并用回调更新。它包含四个独立责任：</p>
+    <ol><li>多行提示词：Enter 提交，Shift + Enter 换行，并避开中文输入法组合事件。</li><li>模式切换：文本、图片、视频共享一处选择器。</li><li>尺寸选择：仅媒体模式显示。</li><li>参考图：只在图片模式显示，限制 PNG/JPEG/WebP 和 10 MB，并在浏览器中读为 Data URL。</li></ol>
+    <pre><code>if (event.key === "Enter" &amp;&amp; !event.shiftKey &amp;&amp; !event.nativeEvent.isComposing) {
+  event.preventDefault()
+  event.currentTarget.form?.requestSubmit()
+}</code></pre>
+
+    <h2>6. 为所有结果状态设计界面</h2>
+    <p><code>Conversation</code> 不是只渲染“成功内容”。每个 <code>ConversationEntry</code> 都可能处于 <code>loading</code>、<code>success</code> 或 <code>error</code>。先把这三种状态画全，再分别处理文本、图片和视频的成功结果。这样用户能在慢速视频生成期间得到明确反馈，而不是面对空白区域。</p>
+    <p>文本用 <code>react-markdown</code> 与 GFM 插件渲染；图片提供下载与“编辑此图”；视频使用原生 <code>&lt;video controls&gt;</code>。媒体 URL 和提示词都来自同一个条目，展示层无需知道 API 响应细节。</p>
+
+    <h2>动手练习</h2>
+    <div class="exercise"><ol><li>按本章布局建立 <code>AppSidebar</code>、<code>WelcomePanel</code>、<code>Conversation</code> 和 <code>PromptComposer</code> 四个空组件。</li><li>在 <code>App</code> 中用一个 <code>entries</code> 数组切换欢迎页与会话页。</li><li>把编辑器固定在底部，让中间区域在 20 条假消息时独立滚动。</li><li>为发送按钮、上传参考图按钮和侧栏关闭按钮加入可读的 <code>aria-label</code>。</li></ol><p><strong>自检：</strong>如果长消息使底部编辑器被推出窗口，先检查中间滚动区和它的父级是否使用了 <code>min-h-0</code>。</p></div>
+
+    <h2>下一章</h2><p>第 4 章会把这个编辑器连接到真正的任务模型：生成模式、尺寸、参考图校验、并发限制和提交状态。</p>
+    <h2>延伸阅读</h2><p>主参考：<a href="https://ui.shadcn.com/docs">shadcn/ui 官方文档</a>。本项目将其作为可组合 UI 原语，而不是将页面逻辑放进组件库。</p>
+  </article>
+</html>

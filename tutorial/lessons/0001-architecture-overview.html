@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第 1 章：认识目标应用与技术架构</title>
+  <style>
+    body { max-width: 900px; margin: 48px auto; padding: 0 24px 80px; color: #24221f; font: 17px/1.75 system-ui, -apple-system, sans-serif; }
+    h1, h2, h3 { line-height: 1.25; color: #1d1d1b; } h1 { font-size: 2.25rem; } h2 { margin-top: 2.4rem; }
+    .lead { color: #625e58; font-size: 1.15rem; } .note { border-left: 4px solid #d85b32; padding: 8px 16px; background: #fff7f2; }
+    .flow { overflow-x: auto; border-radius: 12px; padding: 20px; background: #f4f2ed; white-space: pre; font: 14px/1.6 ui-monospace, SFMono-Regular, monospace; }
+    code { background: #f1efea; border-radius: 4px; padding: 2px 5px; } li { margin: .35rem 0; }
+    a { color: #b64624; } .exercise { padding: 18px 20px; border: 1px solid #ddd7cf; border-radius: 12px; }
+  </style>
+  <article>
+    <p><a href="../course-outline.md">← 课程大纲</a> · <a href="../reference/architecture-map.html">架构速查表</a></p>
+    <h1>第 1 章：认识目标应用与技术架构</h1>
+    <p class="lead">目标：在写第一行业务代码前，能清楚说明一次用户创作请求如何穿过界面、Agent、模型 API 与浏览器存储。</p>
+
+    <h2>1. 先看应用要解决什么</h2>
+    <p>这是一个纯浏览器端创作工作台。读者输入提示词，选择文本、图片或视频模式；应用调用 Agnes 并把结果放进当前对话。它还支持图生图、历史线程与本地恢复。</p>
+    <p>“纯浏览器端”是本教程的一个刻意选择：没有自己的业务服务器。浏览器直接请求 Agnes API，因此界面响应快、部署简单，但 <strong>任何以 <code>VITE_</code> 开头的配置和用户输入的 API Key 都处在客户端信任边界内</strong>。不要把它误解为服务端秘密管理方案。</p>
+
+    <h2>2. 一次请求的完整路径</h2>
+    <div class="flow">用户提交提示词
+  │
+  ▼
+PromptComposer 提交表单
+  │
+  ▼
+App.handleSubmit
+  ├─ 创建 loading ConversationEntry
+  ├─ 从当前线程提取最近文本问答作为 history
+  └─ 调用 runAgnesAgent
+          │
+          ▼
+     LangGraph route
+      ├─ text  → generateText
+      ├─ image → generateImage
+      └─ video → generateVideo
+                    │
+                    ▼
+                 Agnes API
+                    │
+                    ▼
+     回写同一 conversationId + entry id
+                    │
+                    ▼
+        Conversation 渲染 + localStorage 持久化</div>
+    <p>这条路径的核心不是“组件之间互相调用”，而是每层只做一种转换：UI 收集意图，<code>App</code> 管理用户可见状态，Agent 选择能力，API 模块负责网络协议，存储模块负责恢复。</p>
+
+    <h2>3. 识别四个关键模块</h2>
+    <ul>
+      <li><code>src/main.tsx</code> 是最小入口：将 <code>App</code> 挂载到页面。</li>
+      <li><code>src/App.tsx</code> 是协调者：维护当前会话、输入模式、并发数量及异步结果回写。</li>
+      <li><code>src/lib/agent.ts</code> 是路由器：LangGraph 根据 <code>mode</code> 选择 <code>write</code>、<code>draw</code> 或 <code>animate</code> 节点。</li>
+      <li><code>src/lib/agnes.ts</code> 是协议适配器：它知道请求 URL、请求体、超时、视频轮询和模型返回格式；其他模块不应该知道这些细节。</li>
+    </ul>
+    <p>这是一条很实用的复刻原则：<strong>让变化最快的外部协议被隔离在一个模块里</strong>。将来更换模型供应商时，优先修改 <code>agnes.ts</code>，而不是把判断散落到组件中。</p>
+
+    <h2>4. 会话状态为何放在 App</h2>
+    <p><code>Conversation</code> 包含标题、创建/更新时间以及一组 <code>ConversationEntry</code>。<code>App</code> 只渲染活动会话的条目，并在提交时给每个请求同时分配会话 ID 和条目 ID。这样即使用户在生成期间切换到另一条线程，返回结果也能被写回原线程。</p>
+    <p class="note">多轮上下文只来自当前线程中成功的文本问答；图片和视频结果可以保留在会话显示中，却不应被拼进文本模型的 <code>messages</code> 数组。</p>
+
+    <h2>5. 动手：在仓库里画出你的架构图</h2>
+    <div class="exercise">
+      <ol>
+        <li>打开 <code>src/App.tsx</code>，找到 <code>handleSubmit</code>。</li>
+        <li>标出它读哪些状态、写哪些状态，以及唯一的异步边界 <code>runAgnesAgent</code>。</li>
+        <li>打开 <code>src/lib/agent.ts</code>，写下三种 <code>mode</code> 分别会到达的函数。</li>
+        <li>打开 <code>src/lib/storage.ts</code>，回答：刷新页面后哪个数据能恢复，哪个运行时数据不能恢复？</li>
+      </ol>
+      <p><strong>自检：</strong>你应能用一句话回答：“视频为什么需要在 API 模块轮询，而不由 React 组件直接轮询？”答案是：网络协议和轮询策略属于外部服务适配细节，应集中在 <code>agnes.ts</code>。</p>
+    </div>
+
+    <h2>下一章</h2>
+    <p>第 2 章将从空目录建立同样的 Vite + React + TypeScript 工程，并配置路径别名、Tailwind 与项目目录。遇到不清楚的术语，直接向课程助手追问，并引用本章的具体小节。</p>
+
+    <h2>延伸阅读</h2>
+    <p>主参考：<a href="https://vite.dev/guide/">Vite 官方 Getting Started</a>。它说明了 Vite 的开发服务器、生产构建和项目入口模型；本项目使用的脚本也建立在这一基础上。</p>
+  </article>
+</html>

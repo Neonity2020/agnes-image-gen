@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agnes 应用架构速查表</title>
+  <style>
+    body { max-width: 860px; margin: 48px auto; padding: 0 24px; color: #1d1d1b; font: 16px/1.65 system-ui, sans-serif; }
+    h1, h2 { line-height: 1.2; } code { background: #f2f0eb; border-radius: 4px; padding: 2px 5px; }
+    .flow { overflow-x: auto; padding: 18px; background: #f8f7f3; border-radius: 12px; white-space: pre; }
+    dt { font-weight: 700; } dd { margin: 0 0 14px; }
+  </style>
+  <h1>Agnes 应用架构速查表</h1>
+  <div class="flow">React UI → App.tsx → lib/agent.ts → lib/agnes.ts → Agnes API
+                 ↓                 ↑
+          localStorage ← lib/storage.ts</div>
+  <h2>模块职责</h2>
+  <dl>
+    <dt><code>src/main.tsx</code></dt><dd>挂载 React 根组件并加载全局样式。</dd>
+    <dt><code>src/App.tsx</code></dt><dd>持有当前会话、表单与任务状态；协调 UI、存储和 Agent。</dd>
+    <dt><code>src/components/</code></dt><dd>展示层：侧栏、会话、提示词编辑器和设置弹窗。</dd>
+    <dt><code>src/lib/agent.ts</code></dt><dd>根据 <code>text</code>、<code>image</code>、<code>video</code> 路由任务。</dd>
+    <dt><code>src/lib/agnes.ts</code></dt><dd>构造 HTTP 请求、解析模型响应、轮询视频任务并标准化错误。</dd>
+    <dt><code>src/lib/storage.ts</code></dt><dd>保存 API Key 与会话，兼容旧本地数据。</dd>
+    <dt><code>src/types.ts</code></dt><dd>定义生成记录、消息条目、会话和聊天上下文的共享类型。</dd>
+  </dl>
+</html>

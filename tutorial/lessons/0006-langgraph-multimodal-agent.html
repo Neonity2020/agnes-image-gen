@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 6 章：用 LangGraph 编排多模态 Agent</title><style>body{max-width:900px;margin:48px auto;padding:0 24px 80px;color:#24221f;font:17px/1.75 system-ui,-apple-system,sans-serif}h1,h2{line-height:1.25;color:#1d1d1b}h1{font-size:2.25rem}h2{margin-top:2.4rem}pre{overflow:auto;border-radius:12px;padding:18px;background:#24221f;color:#f7f4ef;font:14px/1.6 ui-monospace,monospace}code{background:#f1efea;border-radius:4px;padding:2px 5px}pre code{background:transparent;padding:0}.note{border-left:4px solid #d85b32;background:#fff7f2;padding:8px 16px}.exercise{border:1px solid #ddd7cf;border-radius:12px;padding:18px 20px}a{color:#b64624}</style><article>
+<p><a href="../course-outline.md">← 课程大纲</a> · <a href="../reference/agent-graph-map.html">Agent 图速查表</a> · <a href="0005-agnes-api-integration.html">上一章</a></p>
+<h1>第 6 章：用 LangGraph 编排多模态 Agent</h1><p>目标：将“文本、图片、视频该调用哪个函数”的分支，变成一张可视化、可扩展的状态图。</p>
+<h2>1. Agent 在本项目中不是聊天 UI</h2><p>这里的 Agent 是一个<strong>任务编排模块</strong>，不是另一个 React 组件，也不是让模型自主决定工具的黑盒。它接收已经由 UI 确定的 <code>mode</code>，在图中将任务路由至正确的 Agnes 调用函数。这样 React 只需调用一个稳定入口：<code>runAgnesAgent(input)</code>。</p>
+<h2>2. 先定义状态，而不是节点</h2><p>图中的每个节点通过共享状态读写数据。项目用 LangGraph 的 <code>Annotation.Root</code> 声明输入和输出：</p><pre><code>const AgentState = Annotation.Root({
+  prompt: Annotation&lt;string&gt;(),
+  mode: Annotation&lt;GenerationMode&gt;(),
+  apiKey: Annotation&lt;string&gt;(),
+  size: Annotation&lt;string&gt;(),
+  referenceImage: Annotation&lt;string | undefined&gt;(),
+  history: Annotation&lt;ChatMessage[]&gt;(),
+  text: Annotation&lt;string | undefined&gt;(),
+  mediaUrl: Annotation&lt;string | undefined&gt;(),
+})</code></pre><p>前六项是调用方提供的输入；<code>text</code> 与 <code>mediaUrl</code> 是节点产生的输出。状态字段要少且有明确归属，避免把 React 的临时 UI 状态（如弹窗是否打开）混进 Agent。</p>
+<h2>3. 节点只做一次模型调用</h2><pre><code>const graph = new StateGraph(AgentState)
+  .addNode("route", async () =&gt; ({}))
+  .addNode("write", async (state) =&gt; ({
+    text: await generateText(state.prompt, state.apiKey, state.history),
+  }))
+  .addNode("draw", async (state) =&gt; ({
+    mediaUrl: await generateImage(state.prompt, state.size, state.apiKey, state.referenceImage),
+  }))
+  .addNode("animate", async (state) =&gt; ({
+    mediaUrl: await generateVideo(state.prompt, state.size, state.apiKey),
+  }))</code></pre><p>节点返回的是状态补丁，而不是直接修改外部变量。这让一次执行的输入输出可观察，也使后续加日志、重试、审核节点更自然。</p>
+<h2>4. 用条件边表达路由规则</h2><pre><code>.addEdge(START, "route")
+.addConditionalEdges("route", (state) =&gt; state.mode, {
+  text: "write", image: "draw", video: "animate",
+})
+.addEdge("write", END)
+.addEdge("draw", END)
+.addEdge("animate", END)
+.compile()</code></pre><p>路由函数只返回 <code>mode</code>。这比在 <code>App</code> 写一串 <code>if/else</code> 的收益是：流程图、节点名和边清楚说明了所有合法路径；新增模式时会迫使你同时补上节点和路由。</p>
+<h2>5. 提供一个小而稳定的调用接口</h2><pre><code>export function runAgnesAgent(input: AgentInput) {
+  return graph.invoke({ ...input, history: input.history ?? [] })
+}</code></pre><p>调用者不需要知道节点名、边或 LangGraph 状态类型。它只提供提示词、模式、Key、尺寸、可选参考图和历史，再接收文本或媒体 URL。这是本章最重要的模块接口。</p>
+<p class="note">不要在 Agent 图中保存全局会话。会话属于浏览器应用状态；本次调用所需的历史由 <code>App</code> 显式传入。这样每个图执行互不污染，也支持并发任务。</p>
+<h2>动手练习</h2><div class="exercise"><ol><li>安装 <code>@langchain/langgraph</code>，按本章创建三分支图。</li><li>先用返回固定字符串的假 <code>generateText</code>/<code>generateImage</code>/<code>generateVideo</code> 验证路由。</li><li>为每种 <code>mode</code> 调用一次 <code>runAgnesAgent</code>，检查只执行了对应节点。</li><li>新增一个 <code>audio</code> 模式；写下必须改动的状态、节点、条件边和 UI 位置。</li></ol><p><strong>自检：</strong>如果某个节点需要读取 DOM 或调用 <code>setState</code>，它放错层了；节点应只依赖图状态和 API 适配函数。</p></div>
+<h2>下一章</h2><p>第 7 章回到界面层，完善文本 Markdown、图片、视频、下载、复制、加载和错误状态的渲染。</p><h2>延伸阅读</h2><p>主参考：<a href="https://langchain-ai.github.io/langgraphjs/">LangGraph.js 官方文档</a>，重点了解 StateGraph、状态与条件边。</p></article></html>

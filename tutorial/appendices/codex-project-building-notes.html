@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>附录：使用 Codex 构建项目备忘录</title>
+  <style>body{max-width:900px;margin:48px auto;padding:0 24px 80px;color:#24221f;font:17px/1.75 system-ui,-apple-system,sans-serif}h1,h2{line-height:1.25;color:#1d1d1b}h1{font-size:2.25rem}h2{margin-top:2.4rem}pre{overflow:auto;border-radius:12px;padding:18px;background:#24221f;color:#f7f4ef;font:14px/1.6 ui-monospace,monospace}code{background:#f1efea;border-radius:4px;padding:2px 5px}pre code{background:transparent;padding:0}.note{border-left:4px solid #d85b32;background:#fff7f2;padding:8px 16px}.check{border:1px solid #ddd7cf;border-radius:12px;padding:18px 20px}a{color:#b64624}</style>
+  <article>
+    <p><a href="../course-outline.md">← 课程大纲</a> · <a href="../lessons/0010-quality-build-and-deployment.html">第 10 章</a></p>
+    <h1>附录：使用 Codex 构建项目备忘录</h1>
+    <p>把 Codex 当作能够读代码、执行验证、提出修改并接受反馈的工程协作者，而不是一次性代码生成器。下面是一套适合复刻本项目及后续扩展的紧凑工作流。</p>
+
+    <h2>1. 从“结果”开始写任务</h2>
+    <p>一个可靠的任务说明通常包含四项：目标、上下文、约束、完成标准。不要先规定每一步命令；先说明你要交付什么，以及什么绝不能被改动。</p>
+    <pre><code>目标：为当前应用增加会话重命名。
+上下文：阅读 src/App.tsx、src/lib/storage.ts、src/components/app-sidebar.tsx。
+约束：保持 localStorage 兼容；不要引入服务端；Markdown 文件名使用英文。
+完成标准：可重命名、刷新后保留、pnpm typecheck 和 pnpm build 通过。</code></pre>
+    <p>任务复杂、歧义大或会影响数据模型时，先要求 Codex 给出实现方案，确认后再写代码。这能在修改前暴露数据迁移、并发和 UI 语义的关键选择。</p>
+
+    <h2>2. 用对持久化指令的位置</h2>
+    <dl><dt><code>AGENTS.md</code></dt><dd>存放仓库长期约定：目录结构、命令、编码风格、验证标准、不可触碰的边界。更靠近子目录的 <code>AGENTS.md</code> 可覆盖局部规则。</dd><dt>当前对话提示</dt><dd>存放一次性任务目标、范围和临时约束。</dd><dt><code>.codex/config.toml</code></dt><dd>存放受信任仓库的 Codex 配置，例如沙箱、审批、MCP、hooks 或默认行为。</dd><dt>Skill / Plugin</dt><dd>当一个工作流会跨项目重复（例如发布检查、文档生成或安全审查）时再抽取；不要为一次性任务过早建立抽象。</dd></dl>
+    <p class="note">本仓库的 <code>AGENTS.md</code> 已记录构建命令和“Markdown 文件名使用英文”规则。遇到重复错误时，优先更新这类具体规则，而不是在每次提示中重复说明。</p>
+
+    <h2>3. 推荐的实现循环</h2>
+    <ol><li><strong>定向：</strong>让 Codex 先定位相关模块和调用关系，确认当前工作区是否有未提交的用户改动。</li><li><strong>计划：</strong>对跨文件、数据模型或用户流程改动，先审阅方案和验收条件。</li><li><strong>实现：</strong>限制改动范围；让 Codex 保留不相关的脏工作区文件。</li><li><strong>验证：</strong>运行与风险相称的检查。本项目最低为 <code>pnpm typecheck</code> 与 <code>pnpm build</code>。</li><li><strong>审查：</strong>查看 diff；要求 Codex 检查实现是否满足需求、是否遗漏错误路径或迁移逻辑。</li><li><strong>提交：</strong>只暂存本任务文件，使用短小、祈使式提交信息。</li></ol>
+
+    <h2>4. 让 Codex 处理这个项目时的高价值提示</h2>
+    <pre><code>先阅读当前会话、存储和侧栏相关模块。不要修改代码；解释多轮对话
+为什么会串线，并给出两种可选的数据模型及迁移风险。</code></pre>
+    <pre><code>按已确认方案实现。保留 package.json 的现有未提交改动；只改会话功能
+相关文件。完成后运行 pnpm typecheck、pnpm build，并报告未通过项。</code></pre>
+    <pre><code>审查 HEAD 以来的改动：按“是否符合需求”和“是否符合仓库规范”分开报告。
+重点检查 localStorage 迁移、异步任务回写和浏览器端 API Key 暴露。</code></pre>
+
+    <h2>5. 审批、沙箱与安全</h2>
+    <p>保持默认的最小权限，只有在可信仓库且确有必要时才授权更宽范围操作。遇到网络、系统目录写入、Git push 或破坏性命令时，先检查目标与影响，再提供清楚、范围明确的授权理由。不要把真实 API Key、用户会话导出或生产密钥贴进提示词、日志或 Git 提交。</p>
+    <p>对于本应用尤其要记住：<code>VITE_</code> 配置会进入浏览器包；localStorage 中的 Key 仅适合个人原型。需要多人、长期或受控访问时，先设计服务端代理和身份认证，而不是要求 Codex 把密钥“藏起来”。</p>
+
+    <h2>6. 最终检查</h2>
+    <div class="check"><ul><li>任务是否说明了可观察的完成标准？</li><li>Codex 是否知道哪些文件或数据不能修改？</li><li>复杂改动是否在实现前完成方案对齐？</li><li>验证命令是否真的运行，并报告了结果？</li><li>提交是否只包含本任务的文件？</li><li>是否由人审阅了 diff、UX 和生产安全边界？</li></ul></div>
+
+    <h2>官方参考</h2>
+    <p><a href="https://developers.openai.com/codex/">Codex 文档</a> · <a href="https://learn.chatgpt.com/guides/best-practices">Codex Best practices</a> · <a href="https://learn.chatgpt.com/docs/agent-configuration/agents-md">AGENTS.md 指南</a></p>
+  </article>
+</html>

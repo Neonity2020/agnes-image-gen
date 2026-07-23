@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第 2 章：初始化 Vite + React + TypeScript 工程</title>
+  <style>
+    body{max-width:900px;margin:48px auto;padding:0 24px 80px;color:#24221f;font:17px/1.75 system-ui,-apple-system,sans-serif}h1,h2{line-height:1.25;color:#1d1d1b}h1{font-size:2.25rem}h2{margin-top:2.4rem}pre{overflow:auto;border-radius:12px;padding:18px;background:#24221f;color:#f7f4ef;font:14px/1.6 ui-monospace,monospace}code{background:#f1efea;border-radius:4px;padding:2px 5px}pre code{padding:0;background:transparent}.note{border-left:4px solid #d85b32;background:#fff7f2;padding:8px 16px}.exercise{border:1px solid #ddd7cf;border-radius:12px;padding:18px 20px}a{color:#b64624}
+  </style>
+  <article>
+    <p><a href="../course-outline.md">← 课程大纲</a> · <a href="../reference/project-setup-checklist.html">初始化检查表</a> · <a href="0001-architecture-overview.html">上一章</a></p>
+    <h1>第 2 章：初始化 Vite + React + TypeScript 工程</h1>
+    <p>目标：从空目录创建一个能通过类型检查和生产构建的前端基座，并使它具备与目标应用相同的模块边界和 <code>@/</code> 导入方式。</p>
+
+    <h2>1. 为什么从 Vite 的 React TypeScript 模板开始</h2>
+    <p>目标项目是一个静态浏览器应用：开发时需要快速热更新，发布时需要把资源打包为静态文件。Vite 正好提供开发服务器与生产构建两个部分；React TypeScript 模板则让 JSX、类型检查和组件入口从第一天就可用。</p>
+    <pre><code>pnpm create vite@latest agnes-clone --template react-ts
+cd agnes-clone
+pnpm install
+pnpm dev</code></pre>
+    <p>本仓库要求 Node.js <code>&gt;=20.19.0 || &gt;=22.12.0</code>。先检查 <code>node --version</code>；版本不匹配时不要急着解决依赖错误，先升级 Node。</p>
+
+    <h2>2. 先建立会长期稳定的目录</h2>
+    <pre><code>src/
+├── components/   # 纯展示与交互组件
+├── lib/          # Agent、HTTP、localStorage 等非 UI 行为
+├── App.tsx       # 应用协调者
+├── main.tsx      # React 入口
+├── index.css     # 全局样式与 Tailwind 入口
+└── types.ts      # 跨模块共享的领域类型</code></pre>
+    <p>这里的关键规则是：组件不直接知道 Agnes API 的 URL 或返回格式，<code>lib</code> 也不渲染 JSX。这个小约束会让第 5、6、8 章的扩展集中在少数文件中。</p>
+
+    <h2>3. 配置 Tailwind v4 与 React</h2>
+    <p>安装目标项目所需的构建依赖：</p>
+    <pre><code>pnpm add react react-dom
+pnpm add -D vite typescript @vitejs/plugin-react tailwindcss @tailwindcss/vite @types/react @types/react-dom</code></pre>
+    <p>随后在 <code>vite.config.ts</code> 注册 React 与 Tailwind 插件。项目中使用 ESM，因此通过 <code>fileURLToPath(import.meta.url)</code> 取得配置文件所在目录，再计算稳定的绝对路径。</p>
+    <pre><code>import path from "node:path"
+import { fileURLToPath } from "node:url"
+import tailwindcss from "@tailwindcss/vite"
+import react from "@vitejs/plugin-react"
+import { defineConfig } from "vite"
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url))
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  resolve: { alias: { "@": path.resolve(rootDir, "src") } },
+})</code></pre>
+
+    <h2>4. 让 TypeScript 也认识 <code>@/</code></h2>
+    <p>只配置 Vite alias 还不够：编辑器与 <code>tsc</code> 还会把 <code>@/components/button</code> 当成未知模块。把相同映射写进 <code>tsconfig.app.json</code>，并保持严格模式：</p>
+    <pre><code>{
+  "compilerOptions": {
+    "strict": true,
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src"]
+}</code></pre>
+    <p class="note">路径别名是开发体验工具，不是架构。它的价值是让导入路径表达“从应用根开始”，而不是用一串 <code>../../</code> 暗示文件距离。</p>
+
+    <h2>5. 写下最小可验证入口</h2>
+    <p><code>src/main.tsx</code> 只负责挂载，<code>App.tsx</code> 只负责输出一个占位页面。先确认工程健康，再加入 AI 功能。</p>
+    <pre><code>// src/main.tsx
+import { StrictMode } from "react"
+import { createRoot } from "react-dom/client"
+import App from "@/App"
+import "@/index.css"
+
+createRoot(document.getElementById("root")!).render(
+  &lt;StrictMode&gt;&lt;App /&gt;&lt;/StrictMode&gt;,
+)</code></pre>
+    <pre><code>// src/App.tsx
+export default function App() {
+  return &lt;main&gt;Agnes Clone&lt;/main&gt;
+}</code></pre>
+
+    <h2>6. 质量门：在 UI 之前执行</h2>
+    <pre><code>pnpm typecheck
+pnpm build
+pnpm preview</code></pre>
+    <ul>
+      <li><code>typecheck</code> 应只运行 TypeScript 项目检查，不生成文件。</li>
+      <li><code>build</code> 应先检查类型，再生成 <code>dist/</code>。</li>
+      <li><code>preview</code> 用构建后的产物做本地验收，而非重新启动开发服务器。</li>
+    </ul>
+
+    <h2>动手练习</h2>
+    <div class="exercise">
+      <ol>
+        <li>新建一个 <code>agnes-clone</code> 目录，完成上述初始化。</li>
+        <li>创建 <code>src/lib/example.ts</code>，导出一个字符串常量。</li>
+        <li>从 <code>App.tsx</code> 用 <code>@/lib/example</code> 导入并渲染该常量。</li>
+        <li>执行 <code>pnpm typecheck &amp;&amp; pnpm build</code>。</li>
+      </ol>
+      <p><strong>自检：</strong>若 Vite 能启动但 <code>typecheck</code> 报无法解析 <code>@/</code>，你漏配的是 <code>tsconfig.app.json</code>，而不是 <code>vite.config.ts</code>。</p>
+    </div>
+
+    <h2>下一章</h2>
+    <p>第 3 章会在这个基座上构建创作工作台：侧栏、滚动主区、提示词编辑器与 shadcn/ui 基础组件。</p>
+    <h2>延伸阅读</h2>
+    <p>主参考：<a href="https://vite.dev/guide/">Vite 官方 Getting Started</a>，重点阅读开发服务器、构建命令和 <code>index.html</code> 作为入口的说明。</p>
+  </article>
+</html>

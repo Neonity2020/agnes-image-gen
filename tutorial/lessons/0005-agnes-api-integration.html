@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 5 章：接入 Agnes 模型能力</title><style>body{max-width:900px;margin:48px auto;padding:0 24px 80px;color:#24221f;font:17px/1.75 system-ui,-apple-system,sans-serif}h1,h2{line-height:1.25;color:#1d1d1b}h1{font-size:2.25rem}h2{margin-top:2.4rem}pre{overflow:auto;border-radius:12px;padding:18px;background:#24221f;color:#f7f4ef;font:14px/1.6 ui-monospace,monospace}code{background:#f1efea;border-radius:4px;padding:2px 5px}pre code{background:transparent;padding:0}.note{border-left:4px solid #d85b32;background:#fff7f2;padding:8px 16px}.exercise{border:1px solid #ddd7cf;border-radius:12px;padding:18px 20px}a{color:#b64624}</style><article>
+<p><a href="../course-outline.md">← 课程大纲</a> · <a href="../reference/api-adapter-map.html">API 适配层速查表</a> · <a href="0004-generation-task-form.html">上一章</a></p>
+<h1>第 5 章：接入 Agnes 模型能力</h1><p>目标：把 UI 任务变成可靠的 HTTP 调用，并将供应商协议隔离在 <code>src/lib/agnes.ts</code>。</p>
+<h2>1. 明确客户端配置的安全边界</h2><p>本项目使用 Vite 环境变量选择 API 基址和模型名：</p><pre><code>VITE_AGNES_API_BASE=https://apihub.agnes-ai.com/v1
+VITE_AGNES_TEXT_MODEL=agnes-2.0-flash
+VITE_AGNES_IMAGE_MODEL=agnes-image-2.1-flash
+VITE_AGNES_VIDEO_MODEL=agnes-video-v2.0</code></pre><p><strong>Vite 会把 <code>VITE_</code> 变量暴露给浏览器代码。</strong>它们适合公开的端点和模型选择，不适合保存服务端密钥。这里的 API Key 由用户输入后存到当前浏览器；生产级密钥托管需要下一阶段的服务端代理。</p>
+<h2>2. 先做一个统一请求函数</h2><p>不要让文本、图像、视频函数各自处理 fetch、超时和错误。统一入口使三种能力拥有相同的失败语义：</p><pre><code>async function request(path: string, init: RequestInit, timeoutMs = 360_000) {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() =&gt; controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(`${API_BASE}${path}`, { ...init, signal: controller.signal })
+    const payload = await response.json().catch(() =&gt; ({}))
+    if (!response.ok) throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
+    return payload
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}</code></pre><p>注意 <code>finally</code>：即使请求失败或 JSON 无法解析，也必须取消定时器。不同任务可以传不同超时；视频创建和轮询通常比文本更长。</p>
+<h2>3. 封装认证和文本请求</h2><p>请求头只有一个来源，避免某个调用遗漏 Content-Type 或 Bearer Token：</p><pre><code>function headers(apiKey: string) {
+  return { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }
+}
+
+export async function generateText(prompt: string, apiKey: string, history: ChatMessage[]) {
+  return request("/chat/completions", {
+    method: "POST", headers: headers(apiKey),
+    body: JSON.stringify({ model: TEXT_MODEL, messages: [
+      { role: "system", content: "You are Agnes, a helpful assistant." },
+      ...history, { role: "user", content: prompt },
+    ] }),
+  })
+}</code></pre><p>历史由第 8 章的当前会话产生；API 适配层只接受已经整理好的 <code>ChatMessage[]</code>，不关心 React 状态。</p>
+<h2>4. 处理不同媒体响应形状</h2><p>图片和视频服务可能返回 URL、base64，或位于嵌套字段。将这种不稳定性收敛到 <code>mediaFromResponse</code>，上层只接收 <code>string | undefined</code>：</p><pre><code>function mediaFromResponse(payload: ApiPayload, kind: "image" | "video") {
+  const result = payload.data?.[0]
+  const url = result?.url ?? payload.video_url ?? payload.output?.url
+  if (url) return url
+  if (result?.b64_json) return `data:${kind === "image" ? "image/png" : "video/mp4"};base64,${result.b64_json}`
+}</code></pre><p>图生图时，将第 4 章处理过的 Data URL 作为可选字段传入图片请求；文本和视频请求不应接收这个参数。</p>
+<h2>5. 视频是“创建 + 轮询”的长任务</h2><p>视频接口可能立即返回媒体 URL，也可能只返回 <code>video_id</code> 或 <code>task_id</code>。正确流程是：先创建任务；若没有 URL，每隔固定时间请求状态；出现 URL 时结束；状态为 failed/error/cancelled 或超过最大次数时抛出错误。</p><p class="note">轮询属于外部协议，应该位于 <code>agnes.ts</code>，不能放在 React 组件中。否则组件会同时负责显示、任务状态和供应商网络细节。</p>
+<h2>6. 把技术异常翻译为用户反馈</h2><p>用户不需要看到 <code>AbortError</code>。应用在 API 模块提供 <code>normalizeGenerationError</code>：超时提示稍后重试，网络 TypeError 提示检查网络/CORS，其余 Error 返回服务端消息。<code>App</code> 捕获异常后把该文本写入对应条目的 <code>error</code> 字段。</p>
+<h2>动手练习</h2><div class="exercise"><ol><li>新建 <code>src/lib/agnes.ts</code>，先只实现带超时的 <code>request</code>。</li><li>实现 <code>generateText</code>，用浏览器 Network 面板确认 system、history、当前 prompt 的顺序。</li><li>为图像响应写一个 <code>mediaFromResponse</code>，分别用 URL 和 base64 假数据验证。</li><li>模拟 500、网络断开和 AbortError，确认 UI 得到不同的可读错误。</li></ol><p><strong>自检：</strong>当未来替换模型供应商时，React 组件是否需要改？理想答案是无需修改或只修改很少；协议变化应被隔离在这个文件。</p></div>
+<h2>下一章</h2><p>第 6 章将用 LangGraph 把文本、图片和视频调用组合成可读、可扩展的多模态 Agent 图。</p><h2>延伸阅读</h2><p>主参考：<a href="https://developer.mozilla.org/docs/Web/API/AbortController">MDN AbortController</a>，了解浏览器如何取消 fetch 请求。</p></article></html>

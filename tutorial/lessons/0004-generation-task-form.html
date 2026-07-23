@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 4 章：设计生成任务与表单交互</title><style>body{max-width:900px;margin:48px auto;padding:0 24px 80px;color:#24221f;font:17px/1.75 system-ui,-apple-system,sans-serif}h1,h2{line-height:1.25;color:#1d1d1b}h1{font-size:2.25rem}h2{margin-top:2.4rem}pre{overflow:auto;border-radius:12px;padding:18px;background:#24221f;color:#f7f4ef;font:14px/1.6 ui-monospace,monospace}code{background:#f1efea;border-radius:4px;padding:2px 5px}pre code{background:transparent;padding:0}.note{border-left:4px solid #d85b32;background:#fff7f2;padding:8px 16px}.exercise{border:1px solid #ddd7cf;border-radius:12px;padding:18px 20px}a{color:#b64624}</style><article>
+<p><a href="../course-outline.md">← 课程大纲</a> · <a href="../reference/task-lifecycle.html">任务生命周期</a> · <a href="0003-creative-workspace-ui.html">上一章</a></p>
+<h1>第 4 章：设计生成任务与表单交互</h1><p>目标：把编辑器输入转成可靠的异步任务，并在请求前、请求中和结束后始终给用户正确反馈。</p>
+<h2>1. 用领域类型描述任务</h2><p>先定义三种能力与一条可渲染结果记录：</p><pre><code>type GenerationMode = "text" | "image" | "video"
+type ConversationEntry = { id: string; prompt: string; mode: GenerationMode; created: number; size?: string; text?: string; mediaUrl?: string; status: "loading" | "success" | "error"; error?: string }</code></pre><p><code>status</code> 是任务生命周期的唯一状态字段。不要再维护容易互相矛盾的 <code>isLoading</code>、<code>hasError</code> 和 <code>hasResult</code>。</p>
+<h2>2. 提交前做三层验证</h2><ol><li><strong>内容：</strong><code>prompt.trim()</code> 为空时直接返回。</li><li><strong>资源：</strong>没有 API Key 时打开设置弹窗，不发无效请求。</li><li><strong>容量：</strong>当 <code>activeTaskCount</code> 达到 <code>MAX_CONCURRENT_TASKS</code> 时拒绝新任务并提示。</li></ol><pre><code>const cleanPrompt = prompt.trim()
+if (!cleanPrompt) return
+if (activeTaskCount >= MAX_CONCURRENT_TASKS) return toast.info("任务已达上限")
+if (!apiKey) { setSettingsOpen(true); return }</code></pre><p class="note">禁用发送按钮只能改善体验，不能替代提交处理函数中的验证；键盘提交和未来的新入口都可能绕过按钮。</p>
+<h2>3. 先显示 pending，再等待模型</h2><p>验证通过后立刻创建 <code>loading</code> 条目。用户马上能看到自己的提示词和处理状态，而不必等待 API 返回。</p><pre><code>const id = crypto.randomUUID()
+const pending: ConversationEntry = { id, prompt: cleanPrompt, mode, created: Date.now(), status: "loading", size: mode === "text" ? undefined : size }
+setEntries((current) =&gt; [...current, pending])</code></pre><p>真实项目更新的是嵌套的 <code>conversations</code>；这里的关键顺序不变：写 pending、清空编辑器、增加任务数，最后才请求模型。</p>
+<h2>4. 把参考图当作受限数据转换</h2><p>图生图不能直接把浏览器 <code>File</code> 塞进 JSON。先验证 PNG/JPEG/WebP 类型和 10 MB 大小限制，再用 <code>FileReader.readAsDataURL</code> 转为 Data URL：</p><pre><code>if (!REFERENCE_IMAGE_TYPES.has(file.type)) return toast.error("请选择 PNG、JPEG 或 WebP 图片")
+if (file.size > 10 * 1024 * 1024) return toast.error("参考图不能超过 10 MB")
+const reader = new FileReader()
+reader.onload = () =&gt; onReferenceImageChange(reader.result as string)
+reader.readAsDataURL(file)</code></pre><p>提交时先把参考图存到局部变量，再清除编辑器中的参考图状态；下一次生成不会意外复用它。</p>
+<h2>5. 异步回写必须能精确定位</h2><p>用户可以在视频生成期间切换线程。完成处理不能依赖“当前显示的会话”，而必须捕获提交时的 <code>conversationId</code> 和条目 <code>id</code>：</p><pre><code>setConversations((current) =&gt; current.map((conversation) =&gt;
+  conversation.id === conversationId ? { ...conversation,
+    entries: conversation.entries.map((entry) =&gt;
+      entry.id === id ? { ...entry, status: "success", mediaUrl: result.mediaUrl } : entry) }
+  : conversation,
+))</code></pre><p>失败路径用同样方式写入 <code>status: "error"</code> 和标准化错误。无论成败，<code>finally</code> 都要递减任务数并把焦点放回编辑器。</p>
+<h2>动手练习</h2><div class="exercise"><ol><li>为表单增加文本、图片、视频三种模式和尺寸选择器。</li><li>用延迟一秒的假 Promise 实现 loading → success 与 loading → error。</li><li>同时提交两条任务，再切换线程，验证各自回写到正确条目。</li><li>上传 11 MB 文件和错误类型文件，确认请求不会发出。</li></ol><p><strong>自检：</strong>如果失败后发送按钮一直禁用，检查递减 <code>activeTaskCount</code> 的代码是否放在 <code>finally</code>。</p></div>
+<h2>下一章</h2><p>第 5 章将把任务模型接入 Agnes HTTP API，并处理环境变量、请求头、超时、响应解析和错误归一化。</p><h2>延伸阅读</h2><p>主参考：<a href="https://react.dev/learn/adding-interactivity">React 官方交互指南</a>，重点关注受控输入与事件处理。</p></article></html>

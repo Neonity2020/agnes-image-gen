@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 10 章：质量保障、构建与部署</title><style>body{max-width:900px;margin:48px auto;padding:0 24px 80px;color:#24221f;font:17px/1.75 system-ui,-apple-system,sans-serif}h1,h2{line-height:1.25;color:#1d1d1b}h1{font-size:2.25rem}h2{margin-top:2.4rem}pre{overflow:auto;border-radius:12px;padding:18px;background:#24221f;color:#f7f4ef;font:14px/1.6 ui-monospace,monospace}code{background:#f1efea;border-radius:4px;padding:2px 5px}pre code{background:transparent;padding:0}.note{border-left:4px solid #d85b32;background:#fff7f2;padding:8px 16px}.exercise{border:1px solid #ddd7cf;border-radius:12px;padding:18px 20px}a{color:#b64624}</style><article>
+<p><a href="../course-outline.md">← 课程大纲</a> · <a href="../reference/release-checklist.html">发布检查清单</a> · <a href="0009-local-storage-and-migration.html">上一章</a></p>
+<h1>第 10 章：质量保障、构建与部署</h1><p>目标：把本地可运行的复刻项目变成可公开访问的静态站点，并知道上线前必须验证什么、哪些风险不能靠部署平台解决。</p>
+<h2>1. 建立最小质量门</h2><p>当前项目没有自动化测试脚本，因此每次发布至少运行两道确定性检查：</p><pre><code>pnpm typecheck
+pnpm build
+pnpm preview</code></pre><p><code>typecheck</code> 通过 TypeScript 项目引用检查类型，不生成输出；<code>build</code> 先运行类型检查，再由 Vite 生成 <code>dist/</code>；<code>preview</code> 服务的是构建产物，而不是开发服务器。最后一步能发现“开发时碰巧可用、生产资源路径却错误”的问题。</p>
+<h2>2. 用场景验证，而不只是点开首页</h2><p>手动验收应覆盖应用的真实状态机。每次部署前至少检查：</p><ul><li>空状态、提示词建议与 API Key 缺失提示。</li><li>文本、图片、视频三种模式；包括慢视频的等待和失败状态。</li><li>参考图的上传、移除、图生图复用和错误文件校验。</li><li>连续三轮文本上下文、线程切换和删除线程。</li><li>刷新页面后恢复会话；在隐私/无痕环境确认失败提示仍可理解。</li><li>手机宽度下的侧栏、长 Markdown 表格、图片和视频。</li></ul><p>把这份列表写进 PR 描述或发布记录，比“已测试”更可审计。</p>
+<h2>3. 正确理解构建警告</h2><p>Vite 可能提示某些 JavaScript chunk 压缩后超过 500 kB。警告不等于发布失败，但它提醒你衡量首屏加载。先用构建输出识别大 chunk；再决定是否需要把 Agent、Markdown 或媒体功能做动态导入。</p><pre><code>const { runAgnesAgent } = await import("@/lib/agent")</code></pre><p>本项目已经在提交任务时动态导入 Agent，避免把它作为初始页面逻辑的一部分。优化前应先测量，避免为了消除数字而牺牲可维护性。</p>
+<h2>4. 配置 Netlify 静态部署</h2><p>这个应用不需要运行时服务器。将 Git 仓库连接到 Netlify，并使用仓库中的 <code>netlify.toml</code>：</p><pre><code>[build]
+  command = "npm run build"
+  publish = "dist"
+  [build.environment]
+    NODE_VERSION = "22"</code></pre><p>Node 版本必须满足项目要求 <code>&gt;=20.19.0 || &gt;=22.12.0</code>。即使你本地使用 pnpm，Netlify 使用 npm 执行构建命令也可以；重点是锁定依赖、确保命令能重现，并在 CI 中使用兼容 Node。</p>
+<h2>5. 将安全头和缓存当作部署配置的一部分</h2><p>现有配置为所有页面设置 <code>X-Content-Type-Options: nosniff</code>、<code>X-Frame-Options: DENY</code> 与 <code>Referrer-Policy: strict-origin-when-cross-origin</code>；对带 hash 的 <code>/assets/*</code> 设置长期 immutable 缓存。这些设置适合静态构建产物：新构建会产生新文件名，旧资源可以安全缓存。</p><p class="note">安全头不能解决客户端 API Key 暴露问题，也不能绕过 Agnes API 的 CORS 限制。必须在真实 Netlify 域名用浏览器 Network 面板验证请求；若供应商不允许浏览器跨域，架构需要服务端代理。</p>
+<h2>6. 对外发布前的文档与隐私说明</h2><p>README 或站点说明应明确三件事：请求从浏览器直连 Agnes；Key 和会话在本机 localStorage；生成内容需要用户自行核验。不要声称 Key “安全保存”，也不要在示例中提交真实 token、截图中的个人记录或私有生成 URL。</p>
+<h2>最终练习：从 clone 到上线</h2><div class="exercise"><ol><li>克隆项目，安装依赖并运行完整质量门。</li><li>修改一个可见 UI 文案，确认 typecheck、build 和 preview 均能反映改动。</li><li>将仓库接入 Netlify，验证构建日志使用正确 Node 版本并发布 <code>dist</code>。</li><li>在部署 URL 完成文本和图片生成；记录 CORS、请求耗时和任何浏览器控制台错误。</li><li>使用发布检查清单复核后，为项目写一份简短发布说明。</li></ol><p><strong>自检：</strong>如果本地开发可用、部署后请求失败，先查浏览器 Network 的实际 API 响应与 CORS 头，而不是先改 React 状态代码。</p></div>
+<h2>课程完成与下一步</h2><p>至此，你已从零复刻一个可部署的多模态 Agnes 创作应用：Vite/React UI、任务状态、API 适配、LangGraph 路由、媒体结果、多轮线程与本地恢复。下一步可从大纲的延伸项目中任选一项：会话搜索/导出、流式输出/取消，或引入服务端代理与认证。</p><h2>延伸阅读</h2><p>主参考：<a href="https://docs.netlify.com/build/configure-builds/overview/">Netlify 构建配置文档</a>，结合 Vite 文档理解静态部署的构建与发布目录。</p></article></html>

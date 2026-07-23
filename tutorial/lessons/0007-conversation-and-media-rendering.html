@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 7 章：渲染对话与媒体结果</title><style>body{max-width:900px;margin:48px auto;padding:0 24px 80px;color:#24221f;font:17px/1.75 system-ui,-apple-system,sans-serif}h1,h2{line-height:1.25;color:#1d1d1b}h1{font-size:2.25rem}h2{margin-top:2.4rem}pre{overflow:auto;border-radius:12px;padding:18px;background:#24221f;color:#f7f4ef;font:14px/1.6 ui-monospace,monospace}code{background:#f1efea;border-radius:4px;padding:2px 5px}pre code{background:transparent;padding:0}.note{border-left:4px solid #d85b32;background:#fff7f2;padding:8px 16px}.exercise{border:1px solid #ddd7cf;border-radius:12px;padding:18px 20px}a{color:#b64624}</style><article>
+<p><a href="../course-outline.md">← 课程大纲</a> · <a href="../reference/result-rendering-matrix.html">结果渲染矩阵</a> · <a href="0006-langgraph-multimodal-agent.html">上一章</a></p>
+<h1>第 7 章：渲染对话与媒体结果</h1><p>目标：根据同一种 <code>ConversationEntry</code> 渲染文本、图片、视频、加载和失败状态，并给每种结果提供恰当的后续操作。</p>
+<h2>1. 先渲染用户输入，再渲染模型结果</h2><p>每个条目始终先显示用户的 <code>prompt</code>，然后才是模型状态或结果。这样即使请求失败，用户也知道哪个创作意图没有完成；也能在长线程中快速定位上下文。</p><pre><code>{entries.map((entry) =&gt; (
+  &lt;div key={entry.id}&gt;
+    &lt;UserBubble prompt={entry.prompt} /&gt;
+    &lt;Result entry={entry} /&gt;
+  &lt;/div&gt;
+))}</code></pre><p>条目 <code>id</code> 是稳定 key。不要用数组下标，否则并发任务完成、删除或重新排序时 React 可能把错误的 DOM 复用给另一条消息。</p>
+<h2>2. 状态与媒体类型是两个维度</h2><p>先按 <code>loading / error / success</code> 分支，再只在 success 下按 <code>text / image / video</code> 分支。这样 loading 和 error 不需要为每种模式复制一套组件。</p><pre><code>if (entry.status === "loading") return &lt;LoadingCard mode={entry.mode} /&gt;
+if (entry.status === "error") return &lt;ErrorCard message={entry.error} /&gt;
+if (entry.text) return &lt;MarkdownResult text={entry.text} /&gt;
+if (entry.mode === "image") return &lt;ImageResult url={entry.mediaUrl!} /&gt;
+return &lt;VideoResult url={entry.mediaUrl!} /&gt;</code></pre><p>真实项目将这些 JSX 放在一个小组件内以减少抽象层，但分支顺序相同。</p>
+<h2>3. 文本结果需要安全、可用的 Markdown</h2><p>使用 <code>react-markdown</code> 与 <code>remark-gfm</code> 渲染列表、表格和代码块。对模型产生的外链，强制加 <code>target="_blank"</code> 与 <code>rel="noopener noreferrer"</code>。长表格必须放进可横向滚动的容器，避免撑破移动端布局。</p><pre><code>&lt;ReactMarkdown
+  remarkPlugins={[remarkGfm]}
+  components={{
+    a: ({ children, ...props }) =&gt; &lt;a {...props} target="_blank" rel="noopener noreferrer"&gt;{children}&lt;/a&gt;,
+    table: ({ children }) =&gt; &lt;div className="markdown-table-wrap"&gt;&lt;table&gt;{children}&lt;/table&gt;&lt;/div&gt;,
+  }}
+&gt;{entry.text}&lt;/ReactMarkdown&gt;</code></pre><p>复制按钮调用 <code>navigator.clipboard.writeText(entry.text)</code>，复制的是原始 Markdown，而不是渲染后的 DOM 文本，方便用户继续编辑。</p>
+<h2>4. 图片与视频的最小完整体验</h2><p>图片使用 <code>&lt;img&gt;</code>，将提示词作为 <code>alt</code>，并用 <code>object-contain</code> 保持比例。成功图片有两个自然动作：下载原始 URL，以及把 URL 回传给父级作为下一次图生图的参考图。</p><pre><code>&lt;img src={entry.mediaUrl} alt={entry.prompt} /&gt;
+&lt;a href={entry.mediaUrl} download={`agnes-image-${entry.created}.png`}&gt;下载&lt;/a&gt;
+&lt;button onClick={() =&gt; onEditImage(entry.mediaUrl!)}&gt;编辑此图&lt;/button&gt;</code></pre><p>视频优先使用原生 <code>&lt;video controls playsInline&gt;</code>，以获得浏览器的播放、暂停和全屏行为。媒体 URL 来自 entry；渲染组件不需要知道 URL 是即时返回还是轮询得到的。</p>
+<h2>5. 无障碍与等待体验</h2><p>会话容器设置 <code>aria-live="polite"</code>，使屏幕阅读器在新结果到来时可获知更新。loading 文案应区分文本、图片和视频的预期时间；例如视频可能需要数分钟，不能复用“正在组织文字”。同时提供 <code>prefers-reduced-motion</code> 样式，避免动画影响需要减少动态效果的用户。</p><p class="note">不要只用颜色表达错误或加载。错误卡要有文本标题和具体信息；按钮要有可读名称，而不是只放图标。</p>
+<h2>动手练习</h2><div class="exercise"><ol><li>为三种 status 建立假数据，在不请求模型的情况下完整渲染。</li><li>让文本返回包含标题、表格、代码块和外部链接的 Markdown。</li><li>给图片增加下载与“作为参考图”按钮，并验证点击后编辑器进入图像模式。</li><li>在窄屏视口测试长表格、超宽图片与视频控件。</li></ol><p><strong>自检：</strong>若一条任务失败，页面是否仍能显示它的 prompt、模式和错误？如果不能，说明错误状态被设计成了“没有数据”，而不是结果的一种状态。</p></div>
+<h2>下一章</h2><p>第 8 章会将这些条目组织为可持续的多轮线程：新建、切换、恢复、上下文提取与并发安全回写。</p><h2>延伸阅读</h2><p>主参考：<a href="https://github.com/remarkjs/react-markdown">react-markdown 文档</a>，了解安全渲染 Markdown 和自定义组件的边界。</p></article></html>
