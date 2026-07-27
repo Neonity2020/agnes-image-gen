@@ -2,8 +2,8 @@ import type { ChatMessage } from "@/types"
 
 const API_BASE = import.meta.env.VITE_AGNES_API_BASE ?? "https://apihub.agnes-ai.com/v1"
 const API_ROOT = API_BASE.replace(/\/v1\/?$/, "")
-const TEXT_MODEL = import.meta.env.VITE_AGNES_TEXT_MODEL ?? "agnes-2.0-flash"
-const IMAGE_MODEL = import.meta.env.VITE_AGNES_IMAGE_MODEL ?? "agnes-image-2.1-flash"
+export const TEXT_MODEL = import.meta.env.VITE_AGNES_TEXT_MODEL ?? "agnes-2.5-flash"
+export const IMAGE_MODEL = import.meta.env.VITE_AGNES_IMAGE_MODEL ?? "agnes-image-2.1-flash"
 const VIDEO_MODEL = import.meta.env.VITE_AGNES_VIDEO_MODEL ?? "agnes-video-v2.0"
 
 type ApiPayload = {

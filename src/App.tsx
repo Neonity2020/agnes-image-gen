@@ -1,4 +1,4 @@
-import { KeyRound } from "lucide-react"
+import { KeyRound, Circle } from "lucide-react"
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
@@ -13,8 +13,9 @@ import { SettingsDialog } from "@/components/settings-dialog"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/sonner"
 import { WelcomePanel } from "@/components/welcome-panel"
-import { normalizeGenerationError } from "@/lib/agnes"
-import { clearApiKey, readApiKey, readConversations, writeApiKey, writeConversations } from "@/lib/storage"
+import { normalizeGenerationError } from '@/lib/agnes'
+import { TEXT_MODEL, IMAGE_MODEL } from '@/lib/agnes'
+import { clearApiKey, readApiKey, readConversations, writeApiKey, writeConversations } from '@/lib/storage'
 import type { ChatMessage, ConversationEntry, GenerationMode, PromptSuggestion } from "@/types"
 
 const suggestions: PromptSuggestion[] = [
@@ -237,7 +238,7 @@ function App() {
             {entries.length === 0 ? <WelcomePanel suggestions={suggestions} onSelect={selectSuggestion} /> : <Conversation entries={entries} onEditImage={selectEditImage} />}
           </section>
 
-          <PromptComposer prompt={prompt} mode={mode} size={size} activeTaskCount={activeTaskCount} maxConcurrentTasks={MAX_CONCURRENT_TASKS} referenceImage={referenceImage} textareaRef={textareaRef} onPromptChange={setPrompt} onModeChange={(nextMode) => { setMode(nextMode); if (nextMode !== "image") setReferenceImage(null) }} onSizeChange={setSize} onReferenceImageChange={setReferenceImage} onRemoveReferenceImage={removeReferenceImage} onSubmit={handleSubmit} />
+          <PromptComposer prompt={prompt} mode={mode} size={size} activeTaskCount={activeTaskCount} maxConcurrentTasks={MAX_CONCURRENT_TASKS} referenceImage={referenceImage} textareaRef={textareaRef} onPromptChange={setPrompt} onModeChange={(nextMode) => { setMode(nextMode); if (nextMode !== "image") setReferenceImage(null) }} onSizeChange={setSize} onReferenceImageChange={setReferenceImage} onRemoveReferenceImage={removeReferenceImage} onSubmit={handleSubmit} textModel={TEXT_MODEL} imageModel={IMAGE_MODEL} />
         </main>
       </div>
 

@@ -1,4 +1,4 @@
-import { ArrowUp, Frame, Image, ImagePlus, LoaderCircle, MessageSquareText, Video, X } from "lucide-react"
+import { ArrowUp, Circle, Frame, Image, ImagePlus, LoaderCircle, MessageSquareText, Video, X } from "lucide-react"
 import { type ChangeEvent, type FormEvent, type KeyboardEvent, type RefObject, useRef } from "react"
 import { toast } from "sonner"
 
@@ -37,9 +37,11 @@ type Props = {
   onReferenceImageChange: (value: string) => void
   onRemoveReferenceImage: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  textModel: string
+  imageModel: string
 }
 
-export function PromptComposer({ prompt, mode, size, activeTaskCount, maxConcurrentTasks, referenceImage, textareaRef, onPromptChange, onModeChange, onSizeChange, onReferenceImageChange, onRemoveReferenceImage, onSubmit }: Props) {
+export function PromptComposer({ prompt, mode, size, activeTaskCount, maxConcurrentTasks, referenceImage, textareaRef, onPromptChange, onModeChange, onSizeChange, onReferenceImageChange, onRemoveReferenceImage, onSubmit, textModel, imageModel }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -74,6 +76,9 @@ export function PromptComposer({ prompt, mode, size, activeTaskCount, maxConcurr
 
   const placeholder = mode === "text" ? "让 Agnes 写点什么..." : mode === "video" ? "描述你想生成的视频镜头..." : referenceImage ? "描述要改变什么、保留什么..." : "描述你想生成的画面..."
 
+  // 根据当前模式确定使用的模型
+  const currentModel = mode === "text" ? textModel : mode === "video" ? "agnes-video-v2.0" : imageModel
+
   return (
     <div className="absolute bottom-2.5 left-1/2 z-20 w-[calc(100%-24px)] -translate-x-1/2 md:bottom-[17px] md:w-[min(760px,calc(100%-48px))]">
       <form onSubmit={onSubmit} className="rounded-[16px] border border-black/15 bg-white/95 p-[12px_14px_11px] shadow-[0_18px_65px_rgba(42,36,24,.13),0_2px_8px_rgba(42,36,24,.05)] backdrop-blur-2xl transition focus-within:border-[#e36f3f]/35 focus-within:ring-4 focus-within:ring-[#e36f3f]/[.07]">
@@ -84,6 +89,11 @@ export function PromptComposer({ prompt, mode, size, activeTaskCount, maxConcurr
             <button type="button" onClick={onRemoveReferenceImage} aria-label="移除参考图" className="grid size-7 shrink-0 place-items-center rounded-full text-[#85827b] hover:bg-black/5"><X className="size-4" /></button>
           </div>
         )}
+        {/* 显示当前使用的模型 */}
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-[#89867f]">当前模型：</span>
+          <span className="text-[11px] bg-[#f0eee8] px-2 py-0.5 rounded-[4px] text-[#5d5a55] font-medium">{currentModel}</span>
+        </div>
         <Textarea ref={textareaRef} value={prompt} onChange={(event) => onPromptChange(event.target.value)} onKeyDown={handleKeyDown} maxLength={4000} rows={1} placeholder={placeholder} aria-label="创作提示词" className="max-h-[130px] min-h-[35px] field-sizing-content border-0 bg-transparent p-1 text-[14px] leading-relaxed shadow-none focus-visible:border-0 focus-visible:ring-0" />
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
