@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>从零构建 Agnes 多模态创作应用：课程大纲</title>
+  <style>
+    body{max-width:900px;margin:48px auto;padding:0 24px 80px;color:#24221f;font:17px/1.75 system-ui,-apple-system,sans-serif}h1,h2{line-height:1.25;color:#1d1d1b}h1{font-size:2.25rem}h2{margin-top:2.4rem}a{color:#b64624}.chapter{display:block;padding:16px 20px;margin:14px 0;border:1px solid #ddd7cf;border-radius:12px;color:inherit;text-decoration:none}.chapter:hover{border-color:#b64624}.chapter h2{margin:0;color:#b64624}.chapter p{margin:8px 0 0}
+  </style>
+  <article>
+    <h1>从零构建 Agnes 多模态创作应用：课程大纲</h1>
+    <h2>课程定位</h2>
+    <p>通过复刻本仓库的核心能力，学习如何构建一个纯浏览器端的多模态 AI 创作应用：文本问答、文生图、图生图、视频生成，以及可持续的多轮会话。本课程面向具备 JavaScript 基础、希望系统实践 React 与 AI 应用开发的开发者。</p>
+    <h2>学习成果</h2>
+    <p>完成课程后，你将能够搭建并部署一个使用 Agnes API 的 Vite + React + TypeScript 应用，理解客户端 Agent 编排、媒体交互、会话上下文与本地持久化的完整链路。</p>
+    <a class="chapter" href="lessons/0001-architecture-overview.html"><h2>第 1 章：认识目标应用与技术架构</h2><p>拆解界面、客户端 Agent、Agnes API 与浏览器存储的职责，产出应用流程图与领域词汇表。</p></a>
+    <a class="chapter" href="lessons/0002-vite-react-typescript-setup.html"><h2>第 2 章：初始化 Vite + React + TypeScript 工程</h2><p>配置 Vite、TypeScript、路径别名与 Tailwind CSS v4，产出可运行的应用骨架。</p></a>
+    <a class="chapter" href="lessons/0003-creative-workspace-ui.html"><h2>第 3 章：搭建界面与设计系统</h2><p>使用 shadcn/ui、Radix 与 Tailwind 构建静态创作工作台。</p></a>
+    <a class="chapter" href="lessons/0004-generation-task-form.html"><h2>第 4 章：设计生成任务与表单交互</h2><p>实现多模式任务表单、参考图上传、加载态与并发限制。</p></a>
+    <a class="chapter" href="lessons/0005-agnes-api-integration.html"><h2>第 5 章：接入 Agnes 模型能力</h2><p>封装文本、图像、视频生成请求及统一错误处理。</p></a>
+    <a class="chapter" href="lessons/0006-langgraph-multimodal-agent.html"><h2>第 6 章：用 LangGraph 编排多模态 Agent</h2><p>建立路由图，将生成模式映射到正确的 Agent 节点。</p></a>
+    <a class="chapter" href="lessons/0007-conversation-and-media-rendering.html"><h2>第 7 章：渲染对话与媒体结果</h2><p>完成文本、图片、视频、失败状态和图生图操作的结果流。</p></a>
+    <a class="chapter" href="lessons/0008-multi-turn-conversations.html"><h2>第 8 章：实现多轮对话与线程管理</h2><p>实现多线程、多轮上下文与并发任务的安全处理。</p></a>
+    <a class="chapter" href="lessons/0009-local-storage-and-migration.html"><h2>第 9 章：浏览器持久化与数据迁移</h2><p>用 localStorage 实现可恢复的本地优先应用。</p></a>
+    <a class="chapter" href="lessons/0010-quality-build-and-deployment.html"><h2>第 10 章：质量保障、构建与部署</h2><p>验证构建、分析客户端风险并配置 Netlify 静态部署。</p></a>
+    <h2>课程项目与延伸练习</h2>
+    <ul><li>为会话增加重命名、搜索、导出与清空功能。</li><li>增加流式文本输出或任务取消机制。</li><li>将敏感请求迁移到服务端代理，并加入身份认证与云端同步。</li></ul>
+    <h2>附录</h2>
+    <p><a href="appendices/codex-project-building-notes.html">使用 Codex 构建项目备忘录</a>：从任务说明、计划、实现、验证到提交的协作工作流。</p>
+  </article>
+</html>
