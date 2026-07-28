@@ -1,0 +1,32 @@
+{
+  "name": "@agnes/desktop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Agnes Agent desktop application",
+  "author": "Agnes",
+  "main": "src/main.cjs",
+  "scripts": {
+    "dev": "electron .",
+    "build": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.agnes.agent",
+    "productName": "Agnes Agent",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../web/dist",
+        "to": "web"
+      }
+    ]
+  }
+}

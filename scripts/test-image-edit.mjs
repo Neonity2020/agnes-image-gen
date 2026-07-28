@@ -18,7 +18,7 @@ if (!apiKey) {
   process.exit(1)
 }
 
-const imgPath = join(__dirname, "..", "assets", "orange-cat.webp")
+const imgPath = join(__dirname, "..", "apps", "web", "assets", "orange-cat.webp")
 const bytes = readFileSync(imgPath)
 const dataUri = `data:image/webp;base64,${bytes.toString("base64")}`
 

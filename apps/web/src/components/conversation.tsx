@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import type { ConversationEntry } from "@/types"
 
-const modeName = { text: "Agnes 2.0 Flash", image: "Agnes Image 2.1 Flash", video: "Agnes Video 2.0" }
+const modeName = { text: "Agnes 2.5 Flash", image: "Agnes Image 2.1 Flash", video: "Agnes Video 2.0" }
 
 export function Conversation({ entries, onEditImage }: { entries: ConversationEntry[]; onEditImage: (image: string) => void }) {
   return <div className="mx-auto mt-4 w-full max-w-[820px]" aria-live="polite">{entries.map((entry) => (

@@ -1,6 +1,6 @@
 [build]
-  command = "npm run build"
-  publish = "dist"
+  command = "pnpm --filter @agnes/web build"
+  publish = "apps/web/dist"
   # Vite 8 / rolldown requires Node >= 20.19 or >= 22.12
   [build.environment]
     NODE_VERSION = "22"
