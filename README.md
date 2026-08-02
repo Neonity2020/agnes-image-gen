@@ -14,7 +14,7 @@ START -> route -> write   -> END
 
 ```bash
 VITE_AGNES_API_BASE=https://apihub.agnes-ai.com/v1
-VITE_AGNES_TEXT_MODEL=agnes-2.0-flash
+VITE_AGNES_TEXT_MODEL=agnes-2.5-flash
 VITE_AGNES_IMAGE_MODEL=agnes-image-2.1-flash
 VITE_AGNES_VIDEO_MODEL=agnes-video-v2.0
 ```
